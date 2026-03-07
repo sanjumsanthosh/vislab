@@ -455,6 +455,178 @@ function drawGlow(p, x, y, r, col, alpha) {
     p.circle(x, y, r*i);
   }
 }
+
+// ── HEX → RGB ARRAY ──────────────────────────────────────
+// hexRGB('#38bdf8') → [56, 189, 248]
+function hexRGB(hex) {
+  const h = hex.replace('#','');
+  return [
+    parseInt(h.slice(0,2),16),
+    parseInt(h.slice(2,4),16),
+    parseInt(h.slice(4,6),16)
+  ];
+}
+
+// ── SAFE GLOW (no p5 instance needed, uses RGB array) ─────
+// safeGlow(x, y, r, [r,g,b], alpha)
+function safeGlow(x, y, r, rgb, alpha) {
+  noStroke();
+  for (let i = 3; i > 0; i--) {
+    fill(rgb[0], rgb[1], rgb[2], alpha/i);
+    circle(x, y, r*i);
+  }
+}
+
+// ── NODE SYSTEM ───────────────────────────────────────────
+// Replaces per-sketch: activeNode, fadeAlpha, nodeRects, drawTimeline(),
+// caption strip, and the mousePressed hit-test loop.
+//
+// Usage:
+//   const ns = new NodeSystem(NODES);
+//   function draw()         { ns.update(); ns.drawRail(); /* viz */ ns.drawCaption(); }
+//   function mousePressed() { ns.hit(mouseX, mouseY); }
+//
+// NODES format:
+//   { label, color, accent, caption[], children?[] }
+//   children share the same shape (label, color, accent, caption[])
+class NodeSystem {
+  constructor(nodes, opts = {}) {
+    this.nodes   = nodes;
+    this.active  = 0;
+    this.fade    = 0;
+    this._rects  = [];
+    this._cRects = [];   // child node hit rects
+    this.child   = -1;   // active child index (-1 = none)
+    this.opts    = {
+      railY:     opts.railY     ?? 95,
+      margin:    opts.margin    ?? 80,
+      captionY:  opts.captionY  ?? 600,
+      captionH:  opts.captionH  ?? 100,
+      fadeSpeed: opts.fadeSpeed ?? 7,
+    };
+  }
+
+  // Current node: active child when one is selected, otherwise parent node
+  get node() {
+    const n = this.nodes[this.active];
+    if (this.child >= 0 && n.children && this.child < n.children.length)
+      return n.children[this.child];
+    return n;
+  }
+  // Accent RGB of the current node
+  get acRGB() { return hexRGB(this.node.color); }
+  // Always returns the top-level (parent) node
+  get parentNode() { return this.nodes[this.active]; }
+
+  // Call every draw() frame — advances the caption fade-in
+  update() { this.fade = min(255, this.fade + this.opts.fadeSpeed); }
+
+  // Draw the main timeline rail + node dots (and child rail if applicable)
+  drawRail() {
+    const { railY, margin } = this.opts;
+    const railW = width - margin * 2;
+    const step  = this.nodes.length > 1 ? railW / (this.nodes.length - 1) : 0;
+    this._rects = [];
+    const acRGB = hexRGB(this.nodes[this.active].color);
+
+    stroke(40,44,60); strokeWeight(2); noFill();
+    line(margin, railY, margin + railW, railY);
+    stroke(acRGB[0],acRGB[1],acRGB[2],140); strokeWeight(2);
+    line(margin, railY, margin + this.active * step, railY);
+
+    for (let i = 0; i < this.nodes.length; i++) {
+      const nx   = margin + i * step;
+      const nRGB = hexRGB(this.nodes[i].color);
+      const isAct = i === this.active;
+      const r    = isAct ? 14 : 10;
+      this._rects.push({ x:nx-22, y:railY-22, w:44, h:44, idx:i });
+      if (isAct) safeGlow(nx, railY, r*3, nRGB, 60);
+      fill(i <= this.active ? nRGB[0] : 30,
+           i <= this.active ? nRGB[1] : 34,
+           i <= this.active ? nRGB[2] : 50);
+      stroke(nRGB[0],nRGB[1],nRGB[2], isAct ? 255 : 100);
+      strokeWeight(isAct ? 2 : 1);
+      circle(nx, railY, r*2);
+      fill(isAct ? 10 : 180, isAct ? 10 : 190, isAct ? 10 : 215);
+      noStroke(); textSize(isAct ? 11 : 9); textAlign(CENTER,CENTER);
+      text(i+1, nx, railY);
+      fill(isAct ? nRGB[0] : 148, isAct ? nRGB[1] : 163, isAct ? nRGB[2] : 184);
+      textSize(11); textAlign(CENTER,TOP);
+      text(this.nodes[i].label, nx, railY + 18);
+      // Branch indicator ▼ when node has children
+      if (this.nodes[i].children && isAct) {
+        fill(nRGB[0],nRGB[1],nRGB[2],160); noStroke();
+        textSize(9); textAlign(CENTER,TOP);
+        text('▼', nx, railY + 31);
+      }
+    }
+    // Draw child rail when active node has children
+    if (this.nodes[this.active].children) this._drawChildRail();
+  }
+
+  // Internal — draws the secondary (child) rail below the main rail
+  _drawChildRail() {
+    const children = this.nodes[this.active].children;
+    const railY2   = this.opts.railY + 55;
+    const margin2  = 160;
+    const railW2   = width - margin2 * 2;
+    const step     = children.length > 1 ? railW2 / (children.length - 1) : 0;
+    this._cRects   = [];
+    stroke(30,36,50); strokeWeight(1); noFill();
+    line(margin2, railY2, margin2 + railW2, railY2);
+    for (let i = 0; i < children.length; i++) {
+      const nx    = margin2 + i * step;
+      const cRGB  = hexRGB(children[i].color);
+      const isAct = i === this.child;
+      const r     = isAct ? 11 : 8;
+      this._cRects.push({ x:nx-18, y:railY2-18, w:36, h:36, idx:i });
+      if (isAct) safeGlow(nx, railY2, r*2.5, cRGB, 50);
+      fill(isAct ? cRGB[0]:30, isAct ? cRGB[1]:34, isAct ? cRGB[2]:50);
+      stroke(cRGB[0],cRGB[1],cRGB[2], isAct ? 220 : 100);
+      strokeWeight(1); circle(nx, railY2, r*2);
+      fill(isAct ? 10:180, isAct ? 10:190, isAct ? 10:215);
+      noStroke(); textSize(9); textAlign(CENTER,CENTER);
+      text(String.fromCharCode(97 + (i % 26)), nx, railY2);
+      fill(isAct ? cRGB[0]:148, isAct ? cRGB[1]:163, isAct ? cRGB[2]:184);
+      textSize(10); textAlign(CENTER,TOP);
+      text(children[i].label, nx, railY2+13);
+    }
+  }
+
+  // Draw the bottom caption strip with accent text + body lines
+  drawCaption() {
+    const { captionY, captionH } = this.opts;
+    const acRGB = this.acRGB;
+    fill(12,14,26,230); noStroke(); rect(0, captionY, width, captionH);
+    fill(acRGB[0],acRGB[1],acRGB[2], this.fade);
+    noStroke(); textSize(13); textAlign(LEFT,TOP);
+    text(this.node.accent.replace('!!',''), 28, captionY + 12);
+    fill(180,192,215, this.fade);
+    for (let i = 0; i < this.node.caption.length; i++)
+      text(this.node.caption[i], 28, captionY + 36 + i * 22);
+  }
+
+  // Call in mousePressed() — handles both parent and child rail clicks
+  hit(mx, my) {
+    // Child rects checked first (higher priority)
+    for (const r of this._cRects) {
+      if (mx>r.x && mx<r.x+r.w && my>r.y && my<r.y+r.h) {
+        this.child = (this.child === r.idx) ? -1 : r.idx;
+        this.fade  = 0;
+        return;
+      }
+    }
+    // Parent rail
+    for (const r of this._rects) {
+      if (mx>r.x && mx<r.x+r.w && my>r.y && my<r.y+r.h) {
+        this.active = r.idx;
+        this.child  = -1;
+        this.fade   = 0;
+        return;
+      }
+    }
+  }
+}
 </script>
 
 <!-- ── EDITOR + RUNTIME LOGIC ── -->

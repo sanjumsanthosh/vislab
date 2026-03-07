@@ -14,6 +14,12 @@ No build step. No install. Open `index.html` and start coding.
 - [UI Layout](#ui-layout)
 - [How It Works](#how-it-works)
 - [Preamble Framework](#preamble-framework)
+  - [Layout constants](#layout-constants)
+  - [StepManager](#stepmanager)
+  - [NodeSystem](#nodesystem)
+  - [Sketch Patterns](#sketch-patterns)
+  - [Tweakpane helpers](#tweakpane-helpers)
+  - [Utility functions](#utility-functions)
 - [Keyboard Shortcuts](#keyboard-shortcuts)
 - [Example Sketch](#example-sketch)
 - [Running Locally](#running-locally)
@@ -192,7 +198,8 @@ Each run is fully isolated inside a sandboxed `<iframe>`. This means:
 
 ## Preamble Framework
 
-The **VisLab Preamble v1.0** is auto-injected before every sketch. It provides:
+Think of the preamble as the **standard library** of VisLab. Every tool below is injected once before your sketch code and is available for free in every run.  
+**Goal:** a new sketch should only contain the `NODES` array (or `steps` array), the physics/drawing code, and nothing else.
 
 ### Layout constants
 
@@ -235,6 +242,160 @@ function draw() {
 }
 ```
 
+### NodeSystem
+
+`NodeSystem` is a **drop-in timeline + caption engine** for node-based sketches. It eliminates roughly 90–110 lines of boilerplate per sketch:
+
+| Eliminated | Replacement |
+|------------|-------------|
+| `let activeNode, fadeAlpha, nodeRects` state vars | `new NodeSystem(NODES)` |
+| `drawTimeline()` (~40 lines) | `ns.drawRail()` |
+| Caption strip block (~12 lines) | `ns.drawCaption()` |
+| `mousePressed` hit-test loop | `ns.hit(mouseX, mouseY)` |
+
+#### NODES array format
+
+```js
+const NODES = [
+  {
+    label:   'Intro',           // short label shown below the dot
+    color:   '#38bdf8',         // hex accent colour
+    accent:  '!!Key insight',   // caption heading (!! = accent coloured)
+    caption: ['Line one.', 'Line two.'],  // body lines in caption strip
+    // optional: children for a branching child rail
+    children: [
+      { label: 'Path A', color: '#4ade80', accent: 'Branch A', caption: ['...'] },
+      { label: 'Path B', color: '#f59e0b', accent: 'Branch B', caption: ['...'] },
+    ],
+  },
+  // more nodes…
+];
+```
+
+#### Constructor
+
+```js
+const ns = new NodeSystem(NODES, opts);
+```
+
+| Option | Default | Description |
+|--------|---------|-------------|
+| `opts.railY` | `95` | Y position of the main timeline rail |
+| `opts.margin` | `80` | Left/right margin for the rail |
+| `opts.captionY` | `600` | Y position of the caption strip |
+| `opts.captionH` | `100` | Height of the caption strip |
+| `opts.fadeSpeed` | `7` | Alpha increment per frame (caption fade-in speed) |
+
+#### Properties
+
+| Property | Type | Description |
+|----------|------|-------------|
+| `ns.active` | `number` | Index of the currently active parent node |
+| `ns.child` | `number` | Index of the active child node (`-1` = none) |
+| `ns.fade` | `number` | Current caption opacity (0–255) |
+| `ns.node` | `object` | The currently displayed node (child if selected, else parent) |
+| `ns.acRGB` | `[r,g,b]` | RGB array of `ns.node.color` |
+| `ns.parentNode` | `object` | Always the top-level active parent node |
+
+#### Methods
+
+| Method | Description |
+|--------|-------------|
+| `ns.update()` | Advances `ns.fade` each frame. Call at the **top** of `draw()`. |
+| `ns.drawRail()` | Draws the main timeline rail, dots, labels, and child rail (if applicable). |
+| `ns.drawCaption()` | Draws the bottom caption strip with accent heading and body text. |
+| `ns.hit(mx, my)` | Hit-tests mouse position against rail dots; updates `active`/`child` and resets `fade`. Call in `mousePressed()`. |
+
+#### Minimal sketch template
+
+```js
+const NODES = [ /* … */ ];
+const ns = new NodeSystem(NODES);  // optional: new NodeSystem(NODES, { railY: 80 })
+
+function setup() { createCanvas(1024, 1024); }
+
+function draw() {
+  background(8, 10, 20);
+
+  ns.update();       // advance fade
+  ns.drawRail();     // timeline bar
+
+  // ── your visualisation code here ──
+  // use ns.node, ns.acRGB, ns.fade, ns.parentNode
+
+  ns.drawCaption();  // bottom caption strip
+}
+
+function mousePressed() { ns.hit(mouseX, mouseY); }
+```
+
+---
+
+### Sketch Patterns
+
+These three patterns are confirmed keepers — add them to any sketch that fits the description.
+
+#### 1. Branching Timeline
+
+> **Use when:** a concept has a parallel or forking sub-process (DNA replication, electrical circuits, immune response).
+
+Add a `children` array to one or more nodes. `NodeSystem` automatically renders the secondary child rail and a `▼` indicator on the parent dot.
+
+```js
+const NODES = [
+  { label: 'DNA', color: '#4ade80', accent: '!!Replication', caption: ['...'],
+    children: [
+      { label: 'Leading', color: '#38bdf8', accent: 'Continuous', caption: ['...'] },
+      { label: 'Lagging', color: '#f59e0b', accent: 'Fragments',  caption: ['...'] },
+    ]
+  },
+  // …
+];
+```
+
+#### 2. Comparison Pin
+
+> **Use when:** two implementations of the same idea need side-by-side physics (disc vs drum brake, AC vs DC motor, etc.).
+
+Use two sibling nodes with the same index slot in NODES — one "A" variant and one "B" variant. Both share the canvas simultaneously; use `ns.active` to toggle between highlight states.
+
+```js
+const NODES = [
+  { label: 'Disc',  color: '#38bdf8', accent: '!!Disc Brake',  caption: ['...'] },
+  { label: 'Drum',  color: '#f472b6', accent: '!!Drum Brake',  caption: ['...'] },
+];
+
+function draw() {
+  ns.update(); ns.drawRail();
+  drawBrakeA(ns.active === 0);   // highlight when active
+  drawBrakeB(ns.active === 1);
+  ns.drawCaption();
+}
+```
+
+#### 3. Annotation Anchors
+
+> **Use when:** labels belong directly on the diagram — always on, no click needed (nozzle cross-section, heart anatomy, bridge structure, etc.).
+
+Declare anchor points alongside the physics coordinates and call `drawAnnotation()` after each physics pass.
+
+```js
+const ANNOTATIONS = [
+  { label: 'Combustion Chamber', x: 300, y: 200 },
+  { label: 'Throat',             x: 512, y: 350 },
+  { label: 'Nozzle Exit',        x: 720, y: 200 },
+];
+
+function draw() {
+  ns.update(); ns.drawRail();
+  drawNozzle();
+  for (const a of ANNOTATIONS) drawAnnotation(a.x, a.y, a.label, ns.acRGB);
+  ns.drawCaption();
+}
+```
+
+---
+
 ### Tweakpane helpers
 
 ```js
@@ -254,7 +415,9 @@ function setup() {
 |----------|-----------|-------------|
 | `inZone` | `(mx, my, zone) → bool` | Returns `true` if point is inside a layout zone |
 | `drawCrosshair` | `(p, mx, my)` | Draws crosshair lines inside `LAYOUT.VIZ` |
-| `drawGlow` | `(p, x, y, r, col, alpha)` | Layered low-alpha circles for glow effect |
+| `drawGlow` | `(p, x, y, r, col, alpha)` | Layered glow effect using a p5 colour value |
+| `hexRGB` | `(hex) → [r,g,b]` | Converts a hex colour string to an RGB array |
+| `safeGlow` | `(x, y, r, [r,g,b], alpha)` | Glow effect using an RGB array (no `p` instance needed) |
 
 ---
 
