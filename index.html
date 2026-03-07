@@ -88,6 +88,26 @@
       flex-direction: column;
       border-right: 1px solid #1e293b;
       min-width: 300px;
+      transition: width 0.25s ease, min-width 0.25s ease;
+    }
+    #editor-panel.collapsed {
+      width: 36px;
+      min-width: 36px;
+      overflow: hidden;
+    }
+    #editor-panel.collapsed #editor-wrap,
+    #editor-panel.collapsed #console-label,
+    #editor-panel.collapsed #console-panel {
+      display: none;
+    }
+    #editor-panel.collapsed #editor-toolbar .label,
+    #editor-panel.collapsed #editor-toolbar .kbd,
+    #editor-panel.collapsed #editor-toolbar span:not(#collapse-btn) {
+      display: none;
+    }
+    #editor-panel.collapsed #editor-toolbar {
+      padding: 8px 4px;
+      justify-content: center;
     }
     #editor-toolbar {
       background: #111827;
@@ -100,6 +120,19 @@
       color: #64748b;
     }
     #editor-toolbar .label { margin-right: auto; }
+    #collapse-btn {
+      background: #1e293b;
+      border: 1px solid #334155;
+      border-radius: 4px;
+      color: #94a3b8;
+      cursor: pointer;
+      font-size: 13px;
+      padding: 2px 6px;
+      line-height: 1;
+      flex-shrink: 0;
+      transition: background 0.15s;
+    }
+    #collapse-btn:hover { background: #334155; }
 
     .CodeMirror {
       flex: 1;
@@ -242,6 +275,7 @@
     <div id="editor-toolbar">
       <span class="label">📝 Sketch Code</span>
       <span class="kbd">Ctrl+Enter</span> to run
+      <button id="collapse-btn" onclick="toggleEditor()" title="Collapse/expand editor">◀</button>
     </div>
     <div id="editor-wrap">
       <textarea id="code-input"></textarea>
@@ -584,6 +618,21 @@ function drawGlow(p, x, y, r, col, alpha) {
   function copyCode() {
     navigator.clipboard.writeText(cm.getValue());
     logToConsole('Code copied to clipboard.', 'log');
+  }
+
+  // ── Toggle editor panel collapse ──────────────────────
+  function toggleEditor() {
+    const panel = document.getElementById('editor-panel');
+    const btn   = document.getElementById('collapse-btn');
+    const isCollapsed = panel.classList.toggle('collapsed');
+    btn.textContent = isCollapsed ? '▶' : '◀';
+    btn.title = isCollapsed ? 'Expand editor' : 'Collapse editor';
+    // Re-fit CodeMirror after CSS transition (250ms) completes
+    setTimeout(() => {
+      const wrap = document.getElementById('editor-wrap');
+      if (!isCollapsed) cm.setSize('100%', wrap.offsetHeight + 'px');
+      scalePreview();
+    }, 260);
   }
 
   // ── Keyboard shortcuts ─────────────────────────────────
