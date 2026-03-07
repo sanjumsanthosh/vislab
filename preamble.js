@@ -7,13 +7,22 @@
 //  Libraries available: q5.js (p5-compatible), Tweakpane
 // ═══════════════════════════════════════════════════════
 
-// ── LAYOUT CONSTANTS (1024×1024 canvas) ──────────────────
-const LAYOUT = {
+// ── LAYOUT CONSTANTS (responsive to canvas size) ─────────
+let LAYOUT = {
   TITLE:   { x: 0,   y: 0,   w: 1024, h: 60  },
   VIZ:     { x: 0,   y: 60,  w: 620,  h: 690 },
   PANEL:   { x: 630, y: 60,  w: 394,  h: 690 },
   CONTROLS:{ x: 0,   y: 760, w: 1024, h: 264 }
 };
+
+function updateLAYOUT() {
+  LAYOUT = {
+    TITLE:    { x: 0,            y: 0,             w: width,         h: 60 },
+    VIZ:      { x: 0,            y: 60,            w: width * 0.6,   h: height - 200 },
+    PANEL:    { x: width * 0.6,  y: 60,            w: width * 0.4,   h: height - 200 },
+    CONTROLS: { x: 0,            y: height - 140,  w: width,         h: 140 }
+  };
+}
 
 // ── STEP ACCENT COLORS ────────────────────────────────────
 const STEP_COLORS = ['#38bdf8','#4ade80','#f59e0b','#f472b6','#a78bfa'];

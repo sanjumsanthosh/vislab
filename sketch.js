@@ -51,6 +51,7 @@ let pane, navBtns;
 
 function setup() {
   createCanvas(1024, 1024);
+  updateLAYOUT();
 
   // Tweakpane replaces ALL hand-drawn sliders
   pane = makePane('Wave Controls');
