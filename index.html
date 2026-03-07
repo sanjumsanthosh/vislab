@@ -251,6 +251,55 @@
       font-size: 11px;
       color: #94a3b8;
     }
+
+    /* ── PROMPT GENERATOR PANEL ── */
+    #prompt-panel {
+      background: #111827;
+      border-bottom: 1px solid #1e293b;
+      padding: 10px 20px 12px;
+      display: none;
+      flex-direction: column;
+      gap: 8px;
+      flex-shrink: 0;
+    }
+    #prompt-panel.open { display: flex; }
+    #prompt-input-row {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+    #prompt-idea {
+      flex: 1;
+      padding: 6px 12px;
+      background: #1e293b;
+      border: 1px solid #334155;
+      border-radius: 6px;
+      color: #e2e8f0;
+      font-size: 13px;
+      outline: none;
+    }
+    #prompt-idea:focus { border-color: #38bdf8; }
+    #prompt-idea::placeholder { color: #475569; }
+    #prompt-output-row {
+      display: flex;
+      align-items: flex-start;
+      gap: 8px;
+    }
+    #prompt-output {
+      flex: 1;
+      height: 110px;
+      padding: 8px 12px;
+      background: #0f172a;
+      border: 1px solid #334155;
+      border-radius: 6px;
+      color: #94a3b8;
+      font-size: 11px;
+      font-family: 'Courier New', monospace;
+      resize: vertical;
+      line-height: 1.5;
+    }
+    .btn-prompt { background: #0e7490; color: #fff; }
+    .btn-prompt:hover { background: #0891b2; }
   </style>
 </head>
 <body>
@@ -260,11 +309,27 @@
   <h1>⚡ VisLab</h1>
   <span>Creative Coding Playground · q5.js + Tweakpane</span>
   <div class="header-spacer"></div>
+  <button class="btn btn-prompt" onclick="togglePromptPanel()" title="Open Idea Prompt Generator">✨ Prompt</button>
   <button class="btn btn-example" onclick="loadExample()">Load Example</button>
   <button class="btn btn-copy"    onclick="copyCode()">Copy Code</button>
   <button class="btn btn-clear"   onclick="clearConsole()">Clear Console</button>
   <button class="btn btn-stop"    onclick="stopSketch()">■ Stop</button>
   <button class="btn btn-run"     onclick="runSketch()">▶ Run</button>
+</div>
+
+<!-- ── PROMPT GENERATOR PANEL ── -->
+<div id="prompt-panel">
+  <div id="prompt-input-row">
+    <input id="prompt-idea" type="text"
+           placeholder="Describe your sketch idea, e.g. 'Explain how a jet engine works'"
+           onkeydown="if(event.key==='Enter') generatePrompt()"/>
+    <button class="btn btn-prompt" onclick="generatePrompt()">Generate Prompt</button>
+  </div>
+  <div id="prompt-output-row">
+    <textarea id="prompt-output" readonly
+              placeholder="Your ready-to-copy LLM prompt will appear here — paste it into any AI assistant to get sketch code back."></textarea>
+    <button class="btn btn-copy" style="flex-shrink:0" onclick="copyPrompt()">Copy</button>
+  </div>
 </div>
 
 <!-- ── MAIN CONTENT ── -->
@@ -304,10 +369,10 @@
 <!-- ── THE FRAMEWORK PREAMBLE (invisible to user, auto-prepended) ── -->
 <script id="preamble-src" type="text/preamble">
 // ═══════════════════════════════════════════════════════
-//  VISLAB PREAMBLE v1.1  —  auto-loaded, do not edit
+//  VISLAB PREAMBLE v1.2  —  auto-loaded, do not edit
 //  Provides: StepManager, NodeSystem, HintSystem,
-//            ProbePoint, formulaBox, ColorRamp,
-//            subPanel, spanAnnotation,
+//            ZoneHighlight, ProbePoint, formulaBox,
+//            ColorRamp, subPanel, spanAnnotation,
 //            layout zones, Tweakpane helpers
 //  Libraries available: q5.js (p5-compatible), Tweakpane
 // ═══════════════════════════════════════════════════════
@@ -676,7 +741,7 @@ class HintSystem {
     // ── Overlay panel ──────────────────────────────────
     if (this._anim <= 0) return;
     const ow = 420, oh = 36 + this._hints.length * 28 + 16;
-    const ox = width - ow - 12, oy = 64;
+    const ox = 12, oy = 64;
     fill(14, 16, 28, this._anim * 0.95);
     stroke(acRGB[0], acRGB[1], acRGB[2], this._anim * 0.4);
     strokeWeight(1);
@@ -703,6 +768,104 @@ class HintSystem {
     }
     // Click outside overlay closes it
     if (this._open) { this._open = false; return true; }
+    return false;
+  }
+}
+
+// ── ZONE HIGHLIGHT ────────────────────────────────────
+// Clickable diagram regions with hover tooltips and active-zone glows.
+// Zones are registered once in setup(), then driven by update() in draw()
+// and hit() in mousePressed().
+//
+// Usage:
+//   const zones = new ZoneHighlight();
+//   // In setup():
+//   zones.add('intake_valve', CX-CYL_W/2-32, CYL_TOP, 32, 28, 0, 'Intake Valve → Intake');
+//   // In draw() (last, after all viz code):
+//   zones.update(mouseX, mouseY, ns.acRGB, ns.active);
+//   // In mousePressed():
+//   if (zones.hit(mouseX, mouseY, ns)) return;
+class ZoneHighlight {
+  constructor() {
+    this._zones = [];
+  }
+
+  // Register a named hit region.
+  // id = debug name, nodeIdx = ns.active index to jump to on click,
+  // label = tooltip text shown on hover
+  add(id, x, y, w, h, nodeIdx, label) {
+    this._zones.push({ id, x, y, w, h, nodeIdx, label });
+  }
+
+  // Remove all registered zones
+  clear() { this._zones = []; }
+
+  // Update a zone's target node at runtime
+  setNode(id, nodeIdx) {
+    const z = this._zones.find(z => z.id === id);
+    if (z) z.nodeIdx = nodeIdx;
+  }
+
+  // Internal — returns true when (mx, my) is inside zone z
+  _inZone(mx, my, z) {
+    return mx >= z.x && mx <= z.x + z.w && my >= z.y && my <= z.y + z.h;
+  }
+
+  // Call last in draw() — overlays highlights and tooltips.
+  // Pass ns.active as the 4th argument to show a persistent glow on the
+  // zone whose nodeIdx matches the currently active node.
+  update(mx, my, acRGB, nsActive = -1) {
+    for (const z of this._zones) {
+      const hovered  = this._inZone(mx, my, z);
+      const isActive = nsActive >= 0 && z.nodeIdx === nsActive;
+
+      // Active zone: subtle persistent glow even without hover
+      if (isActive && !hovered) {
+        fill(acRGB[0], acRGB[1], acRGB[2], 22);
+        noStroke();
+        rect(z.x, z.y, z.w, z.h, 3);
+      }
+
+      // Hover: semi-transparent accent overlay + 1px border + tooltip
+      if (hovered) {
+        fill(acRGB[0], acRGB[1], acRGB[2], 55);
+        stroke(acRGB[0], acRGB[1], acRGB[2], 200);
+        strokeWeight(1);
+        rect(z.x, z.y, z.w, z.h, 3);
+        this._drawTooltip(mx, my, z.label, acRGB);
+      }
+    }
+  }
+
+  // Internal — draws a tooltip bubble above the cursor
+  _drawTooltip(mx, my, label, acRGB) {
+    const pad = 8, th = 26;
+    const tw  = max(textWidth(label) + pad * 2, 160);
+    // Auto-flip: keep tooltip inside canvas horizontally
+    let tx = mx - tw / 2;
+    if (tx + tw > width  - 10) tx = width  - tw - 10;
+    if (tx        < 10)        tx = 10;
+    const ty = my - th - 12;
+    fill(14, 16, 28, 230);
+    stroke(acRGB[0], acRGB[1], acRGB[2], 160);
+    strokeWeight(1);
+    rect(tx, ty, tw, th, 4);
+    fill(220, 228, 245);
+    noStroke(); textSize(11); textAlign(LEFT, CENTER);
+    text(label, tx + pad, ty + th / 2);
+  }
+
+  // Call in mousePressed() — fires node jump if a zone was hit.
+  // Returns true to signal the click was consumed (prevents double-firing).
+  hit(mx, my, ns) {
+    for (const z of this._zones) {
+      if (this._inZone(mx, my, z)) {
+        ns.active = z.nodeIdx;
+        ns.child  = -1;
+        ns.fade   = 0;
+        return true;
+      }
+    }
     return false;
   }
 }
@@ -1048,6 +1211,57 @@ function spanAnnotation(x1, x2, y, label, rgb, opts = {}) {
   function copyCode() {
     navigator.clipboard.writeText(cm.getValue());
     logToConsole('Code copied to clipboard.', 'log');
+  }
+
+  // ── Prompt Generator ───────────────────────────────────
+  function togglePromptPanel() {
+    const panel = document.getElementById('prompt-panel');
+    const isOpen = panel.classList.toggle('open');
+    if (isOpen) document.getElementById('prompt-idea').focus();
+  }
+
+  function generatePrompt() {
+    const idea = document.getElementById('prompt-idea').value.trim();
+    if (!idea) {
+      document.getElementById('prompt-idea').focus();
+      return;
+    }
+    const prompt =
+`You are an expert creative coder specialising in q5.js (a p5.js-compatible library). Create a VisLab sketch for the concept described below.
+
+**Concept:** ${idea}
+
+**Canvas:** 1024 × 1024 pixels
+
+**VisLab Preamble (auto-loaded — do NOT redefine these):**
+Layout zones: LAYOUT.TITLE {x:0,y:0,w:1024,h:60} | LAYOUT.VIZ {x:0,y:60,w:620,h:690} | LAYOUT.PANEL {x:630,y:60,w:394,h:690} | LAYOUT.CONTROLS {x:0,y:760,w:1024,h:264}
+
+Classes:
+- NodeSystem(nodes, opts) — timeline + caption engine. Methods: update(), drawRail(), drawCaption(), hit(mx,my). Properties: active, child, fade, node, acRGB, parentNode.
+- HintSystem(opts) — ⓘ icon + overlay. Methods: register(hints[]), draw(acRGB), hit(mx,my).
+- ZoneHighlight() — clickable diagram regions. Methods: add(id,x,y,w,h,nodeIdx,label), update(mx,my,acRGB,nsActive), hit(mx,my,ns), clear(), setNode(id,nodeIdx).
+- ProbePoint() — click-to-probe callout. Methods: register(fn), set(x,y), clear(), draw(acRGB), hitClear(mx,my).
+- ColorRamp(stops) — maps 0–1 to RGB via [{t,r,g,b}] stops.
+- StepManager(steps) — multi-step tutorial. Methods: update(), drawTitleBar(), drawPanel(), drawNavButtons().
+
+Functions: formulaBox(x,y,formula,acRGB,opts), subPanel(x,y,w,h,title,rgb,opts), spanAnnotation(x1,x2,y,label,rgb,opts), makePane(title), addSlider(pane,params,key,min,max,step,label), addButton(pane,label,fn), drawGlow(x,y,r,rgb,alpha), safeGlow(x,y,r,rgb,alpha), drawCrosshair(x,y,acRGB), hexRGB(hex)→[r,g,b], inZone(mx,my,zone)→bool.
+
+**Requirements:**
+1. Call createCanvas(1024, 1024) in setup().
+2. Use NodeSystem for multi-step explanations.
+3. Use HintSystem and register at least 2 usage hints.
+4. Draw the visualisation in LAYOUT.VIZ and annotations/data in LAYOUT.PANEL.
+5. Add Tweakpane sliders in setup() for at least one interactive parameter.
+6. Use ZoneHighlight if the diagram has distinct clickable regions.
+7. Return ONLY the sketch code — no preamble, no \`\`\`js fences, no HTML.`;
+    document.getElementById('prompt-output').value = prompt;
+  }
+
+  function copyPrompt() {
+    const out = document.getElementById('prompt-output');
+    if (!out.value) return;
+    navigator.clipboard.writeText(out.value);
+    logToConsole('Prompt copied to clipboard.', 'log');
   }
 
   // ── Toggle editor panel collapse ──────────────────────
