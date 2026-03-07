@@ -21,6 +21,7 @@ No build step. No install. Open `index.html` and start coding.
   - [Tweakpane helpers](#tweakpane-helpers)
   - [Utility functions](#utility-functions)
   - [HintSystem](#hintsystem)
+  - [ZoneHighlight](#zonehighlight)
   - [ProbePoint](#probepoint)
   - [formulaBox](#formulabox)
   - [ColorRamp](#colorramp)
@@ -483,6 +484,77 @@ hints.draw(ns.acRGB);
 
 // In mousePressed(), before ns.hit():
 hints.hit(mouseX, mouseY);
+```
+
+---
+
+### ZoneHighlight
+
+**Clickable diagram regions** with hover tooltips and active-zone glows. Register named zones once in `setup()`, then call `update()` at the end of `draw()` and `hit()` in `mousePressed()`.
+
+```
+     ┌──────────────────────────────────┐
+     │    [zone overlay on hover]       │
+     │  ╔═══════════╗                   │
+     │  ║ Intake    ║  ← tooltip above  │
+     │  ║  Valve    ║                   │
+     │  ╚═══════════╝                   │
+     └──────────────────────────────────┘
+```
+
+#### Constructor
+
+```js
+const zones = new ZoneHighlight();
+```
+
+#### Methods
+
+| Method | Description |
+|--------|-------------|
+| `zones.add(id, x, y, w, h, nodeIdx, label)` | Register a named hit region. `id` = debug name, `nodeIdx` = `ns.active` index to jump to on click, `label` = tooltip text |
+| `zones.update(mx, my, acRGB [, nsActive])` | Call last in `draw()` — draws highlights, glows, and tooltips. Pass `ns.active` as the 4th argument to enable the active-zone persistent glow. |
+| `zones.hit(mx, my, ns)` | Call in `mousePressed()` — fires node jump if a zone was hit. Returns `true` if click was consumed. |
+| `zones.clear()` | Remove all registered zones |
+| `zones.setNode(id, nodeIdx)` | Update a zone's target node index at runtime |
+
+#### Visual behaviour
+
+| State | Appearance |
+|-------|------------|
+| Hover | Semi-transparent accent rect + 1 px accent border + tooltip bubble above cursor |
+| Tooltip near edge | Auto-flips so it stays inside the canvas horizontally |
+| Active (`nodeIdx === ns.active`) | Subtle persistent glow rect even when not hovered |
+| Click | `ns.active` jumps to `nodeIdx`, `ns.fade` resets for caption fade-in |
+
+#### Usage
+
+```js
+const zones = new ZoneHighlight();
+
+// In setup() — register zones once:
+zones.add('intake_valve',  CX-CYL_W/2-32, CYL_TOP, 32, 28, 0, 'Intake Valve → Intake Stroke');
+zones.add('spark_plug',    CX-12,          CYL_TOP-28, 24, 28, 2, 'Spark Plug → Combustion');
+zones.add('exhaust_valve', CX+CYL_W/2,    CYL_TOP, 32, 28, 3, 'Exhaust Valve → Exhaust');
+
+// In draw() — call last so overlays sit on top of geometry:
+function draw() {
+  ns.update();
+  ns.drawRail();
+  hints.draw(ns.acRGB);
+
+  // ... your viz code ...
+
+  zones.update(mouseX, mouseY, ns.acRGB, ns.active);  // nsActive enables glow
+  ns.drawCaption();
+}
+
+// In mousePressed():
+function mousePressed() {
+  if (hints.hit(mouseX, mouseY))     return;
+  if (zones.hit(mouseX, mouseY, ns)) return;  // zones before ns.hit
+  ns.hit(mouseX, mouseY);
+}
 ```
 
 ---
