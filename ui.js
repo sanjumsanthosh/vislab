@@ -221,8 +221,17 @@ function closePromptPanel() {
 
 function togglePromptPreview() {
   const wrap = document.getElementById('prompt-preview-wrap');
+  const outEl = document.getElementById('prompt-output');
+  const labelEl = document.getElementById('prompt-output-label');
   const btn = document.getElementById('prompt-expand-btn');
   const open = wrap.classList.toggle('open');
+  if (open) {
+    outEl.style.display = 'block';
+    labelEl.style.display = 'block';
+  } else {
+    outEl.style.display = 'none';
+    labelEl.style.display = 'none';
+  }
   btn.textContent = open ? 'Collapse' : 'Expand';
 }
 
@@ -241,7 +250,8 @@ function generatePrompt() {
     .replaceAll('{{WIDTH}}', String(width))
     .replaceAll('{{HEIGHT}}', String(height))
     .replaceAll('{{IDEA}}', idea);
-  document.getElementById('prompt-output').value = prompt;
+  // Use textContent for code block to avoid injection issues
+  document.getElementById('prompt-output').textContent = prompt;
   document.getElementById('prompt-meta').textContent = 'Generated (' + width + ' x ' + height + ')';
   logToConsole('Prompt generated.', 'log');
   return prompt;

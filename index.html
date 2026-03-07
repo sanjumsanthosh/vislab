@@ -400,8 +400,8 @@
       <div id="prompt-meta">No prompt generated yet</div>
     </div>
     <div id="prompt-preview-wrap">
-      <textarea id="prompt-output" readonly
-                placeholder="Prompt preview is hidden by default. Click Expand to view."></textarea>
+      <div id="prompt-output-label" style="color:#64748b; font-size:11px; margin-bottom:6px; display:none;">▼ Code block (select all to copy):</div>
+      <pre id="prompt-output" style="display:none; width:100%; height:280px; padding:10px 12px; background:#020617; border:1px solid #334155; border-radius:8px; color:#94a3b8; font-size:10px; font-family:'Courier New',monospace; overflow:auto; margin:0; white-space:pre-wrap; word-break:break-word; line-height:1.4;"></pre>
     </div>
   </div>
 </div>
@@ -454,7 +454,22 @@ interactive textbook page. Use real physics equations. Make sliders drive
 immediate, visible change.
 
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-## STRICT OUTPUT RULES
+## CRITICAL: PREVENT INJECTION ERRORS
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+- NEVER paste code from AI chat if it has copy-paste artifacts
+- NEVER create nested arrays or complex data structures
+- NEVER use backticks, curly braces in strings, or template literals
+- NEVER pass color as [r,g,b] arrays in function calls
+  Pass heatCol directly (it IS already [r,g,b] from ColorRamp)
+  ✗ formulaBox(..., [heatCol, heatCol, heatCol], ...)  -- NOPE
+  ✓ formulaBox(..., heatCol, ...)  -- CORRECT
+- ALWAYS escape apostrophes in long strings to avoid quote breaks
+  ✗ 'This is Diffie-Hellman secret generation'
+  ✓ 'This is Diffie-Hellman: secret generation'
+- NEVER include mathematical notation like {ab}, ^{xy}, special symbols
+- NEVER use Unicode arrows, check marks, or decorative symbols
+- VALIDATE: count all { } [ ] ( ) to match -- unmatched breaks injection
+
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 - Output ONLY raw JavaScript — no markdown fences, no explanations.
 - ALWAYS call createCanvas({{WIDTH}}, {{HEIGHT}}) inside setup().
@@ -544,14 +559,36 @@ LAYOUT ZONES ({{WIDTH}}×{{HEIGHT}} canvas):
 
 ──── formulaBox(x, y, formula, acRGB, opts?) ────────────────
   Draws equation bubble on diagram.
-  opts: { w:260, h:32, size:13, sub:'explanation below formula' }
+  opts: { w:260, h:32, size:13, sub:'explanation' }
+  
+  CRITICAL COLOR RULES:
+  - acRGB parameter is already an [r,g,b] array from ns.acRGB or ColorRamp
+  - NEVER wrap it in brackets again: [acRGB] — breaks injection
+  - NEVER pass [r,g,b,r,g,b] — never triple values
+  - ALWAYS pass color parameter directly:
+    CORRECT:   formulaBox(x, y, 'eq', acRGB, opts)
+    CORRECT:   const col = RAMP.at(t); formulaBox(x, y, 'eq', col, opts)
+    WRONG:     formulaBox(x, y, 'eq', [acRGB[0], acRGB[1], acRGB[2]], opts)
+    WRONG:     formulaBox(x, y, 'eq', [col, col, col], opts)
 
 ──── ColorRamp ──────────────────────────────────────────────
   const ramp = new ColorRamp([{t,r,g,b},…]);
-  ramp.at(t) → [r,g,b]   (t clamped 0–1)
+  const [r,g,b] = ramp.at(t)   returns [r,g,b] clamped 0–1
 
-  ⚠ RAMP_HEAT and RAMP_PRESSURE are NOT guaranteed globals.
-    ALWAYS declare them explicitly at the top of your sketch:
+  ALWAYS declare ramps explicitly — never assume globals:
+  const RAMP_HEAT = new ColorRamp([
+    { t: 0,   r: 80,  g: 140, b: 255 },
+    { t: 0.5, r: 255, g: 140, b: 20  },
+    { t: 1,   r: 255, g: 40,  b: 20  }
+  ]);
+
+  Usage:
+  const heatCol = RAMP_HEAT.at(map(value, minVal, maxVal, 0, 1));
+  formulaBox(x, y, 'text', heatCol, opts)   <-- heatCol IS [r,g,b]
+  safeGlow(x, y, r, heatCol, alpha)         <-- pass directly
+  
+  NEVER: const [r,g,b] = heatCol; formulaBox(..., [r, g, b], ...) 
+         This creates nested arrays and breaks injection
 
   const RAMP_PRESSURE = new ColorRamp([
     { t: 0,   r: 56,  g: 189, b: 248 },
@@ -597,27 +634,32 @@ LAYOUT ZONES ({{WIDTH}}×{{HEIGHT}} canvas):
 ──── subPanel(x, y, w, h, title, rgb, opts?) ────────────────
   Framed panel with mini-title. Use for comparison side-by-side layouts.
 
-  ⚠ Info/physics panels must be placed OUTSIDE the diagram actor zone.
-    For full-width diagrams (actors x:100–1500), place panels at x:1570+.
-    Always verify panel x + w < canvas width.
-    Use compact rows (height ~38px each) so the panel fits in the canvas.
+  [!] Info/physics panels must be placed OUTSIDE the diagram actor zone.
+      For full-width diagrams, place panels at right edge.
+      Always verify panel x + w < canvas width.
+      Use compact rows (height ~38px each) so the panel fits in the canvas.
 
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-## ⚠ Q5.JS COLOR RULES — VIOLATIONS CAUSE RUNTIME CRASH
+## Q5.JS COLOR RULES — VIOLATIONS CAUSE RUNTIME CRASH
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
-  ✗ fill('rgba(74,222,128,0.5)')    CRASH — never CSS rgba strings
-  ✗ fill('#4ade80', 128)            CRASH — never hex+alpha
-  ✗ drawGlow(…)                     CRASH — never drawGlow()
-  ✓ fill(74, 222, 128)              correct
-  ✓ fill(74, 222, 128, 128)         correct with alpha (0–255)
-  ✓ background('#0a0a0f')           OK for background() only
-  ✓ safeGlow(x, y, r, acRGB, 60)   correct glow
+  [ERROR] fill('rgba(74,222,128,0.5)')    CRASH - never CSS rgba
+  [ERROR] fill('#4ade80', 128)            CRASH - never hex with alpha
+  [ERROR] drawGlow(...)                   CRASH - never use drawGlow()
+  [ERROR] formulaBox(..., [r,g,b], ...)   CRASH - NEVER nest RGB in brackets
+  
+  [OK] fill(74, 222, 128)                 correct
+  [OK] fill(74, 222, 128, 128)            correct with alpha
+  [OK] background('#0a0a0f')              OK for background() only
+  [OK] safeGlow(x, y, r, acRGB, 60)      correct - pass acRGB directly
+  [OK] formulaBox(..., acRGB, ...)        correct - pass RGB as-is
+  [OK] formulaBox(..., heatCol, ...)      correct - heatCol from ColorRamp
 
-  ns.acRGB is already [r,g,b] — use directly:
-    fill(ns.acRGB[0], ns.acRGB[1], ns.acRGB[2])
-    fill(ns.acRGB[0], ns.acRGB[1], ns.acRGB[2], 180)
-    safeGlow(x, y, 40, ns.acRGB, 60)
+  REMEMBER: acRGB and heatCol are ALREADY [r,g,b] arrays.
+  Do NOT wrap them again in [ ].
+  Pass them directly to all functions.
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 ## NODESYSTEM FULL TEMPLATE
@@ -693,39 +735,42 @@ function mousePressed() {
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 ## ANTI-PATTERNS — NEVER DO THESE
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-  ✗ Redefining hexRGB, safeGlow, NodeSystem, HintSystem, ZoneHighlight,
-    ProbePoint, formulaBox, ColorRamp, subPanel, or spanAnnotation
-  ✗ fill(node.color) or fill(steps.color) directly
-  ✗ fill('#hex', alpha) with any alpha value
-  ✗ drawGlow() — use safeGlow() instead
-  ✗ safeGlow radius > 40px — produces oversized halos that obscure actors
-  ✗ text('line1\nline2', x, y) — q5.js ignores \n, text overlaps
-    ✓ text('line1', x, y);  text('line2', x, y + lineHeight);
-  ✗ Backtick template literals — `value = ${x}` — breaks injection
-    ✓ 'value = ' + x
-  ✗ zones.update() before viz code — must be the LAST draw() call before caption
-  ✗ ns.hit() before hints.hit() — hints must be checked FIRST
-  ✗ Using StepManager for any concept that has a physical diagram
+  [ERROR] Redefine preamble tools: hexRGB, safeGlow, NodeSystem, etc.
+  [ERROR] fill(node.color) — convert with hexRGB() first
+  [ERROR] fill('#hex', alpha) — never hex + alpha parameter
+  [ERROR] drawGlow() — use safeGlow() instead
+  [ERROR] safeGlow radius > 40px — creates oversized halos
+  [ERROR] formulaBox(..., [heatCol, heatCol, heatCol], ...) — never nest
+  [ERROR] text with newlines — q5.js ignores them, use separate calls
+  [ERROR] Backtick template literals — breaks document.write()
+  [ERROR] Undeclared ColorRamp — always declare explicitly
+  [ERROR] zones.update() before viz code — MUST be before ns.drawCaption()
+  [ERROR] hints.hit() not FIRST call in mousePressed()
+  [ERROR] StepManager for concepts with physical diagrams
+  [ERROR] Zero-width or hidden characters in strings
+  [ERROR] Mathematical notation: {ab}, ^{xy}, unicode symbols
+
+  [OK] formulaBox(x, y, 'text', acRGB, opts) — pass color directly
+  [OK] const heatCol = RAMP.at(t); formulaBox(..., heatCol, ...)
+  [OK] safeGlow(x, y, r, acRGB, 80) — array as-is, no nesting
+  [OK] fill(acRGB[0], acRGB[1], acRGB[2], alpha) — destructured
 
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 ## PRE-FLIGHT CHECKLIST
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-  [ ] createCanvas({{WIDTH}}, {{HEIGHT}}) called inside setup()
-  [ ] NodeSystem chosen (or StepManager with clear justification)
-  [ ] HintSystem.register() called in setup() with 3+ hints
-  [ ] ZoneHighlight used if diagram has named clickable components
-  [ ] ProbePoint used if diagram shows a continuous measurable field
-  [ ] formulaBox() places the governing equation on the diagram
-  [ ] ColorRamp declared explicitly — not assumed as a global
-  [ ] safeGlow radius <= 40px everywhere
-  [ ] No backtick template literals anywhere in sketch code
-  [ ] ColorRamp used for any gradient — not manual lerp colour blending
-  [ ] ns.acRGB used for all accent colours
-  [ ] No fill(cssString, alpha) anywhere
-  [ ] No drawGlow() anywhere — only safeGlow()
-  [ ] No preamble tool redefined
-  [ ] zones.update() is the last draw() call before ns.drawCaption()
-  [ ] hints.hit() is the first mousePressed() call
+  [CHECK] createCanvas({{WIDTH}}, {{HEIGHT}}) in setup()
+  [CHECK] NodeSystem chosen or StepManager justified
+  [CHECK] HintSystem.register() with 3+ hints in setup()
+  [CHECK] All ColorRamps declared explicitly
+  [CHECK] No backtick template literals anywhere
+  [CHECK] No nested arrays in function calls (CRITICAL)
+  [CHECK] No Unicode symbols in any strings
+  [CHECK] safeGlow radius <= 40px everywhere
+  [CHECK] formulaBox() passes colors directly, not [r,g,b]
+  [CHECK] hints.hit() is FIRST in mousePressed()
+  [CHECK] zones.update() is LAST before ns.drawCaption()
+  [CHECK] No preamble functions redefined
+  [CHECK] No drawGlow() calls — only safeGlow()
 
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
