@@ -1,0 +1,725 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>VisLab — Creative Coding Playground</title>
+
+  <!-- ── CDN DEPENDENCIES ── -->
+  <!-- q5.js: p5-compatible, 8x lighter, WebGPU-ready -->
+  <script src="https://q5js.org/q5.js"></script>
+  <!-- Tweakpane: built-in sliders, buttons, color pickers -->
+  <script src="https://cdn.jsdelivr.net/npm/tweakpane@4/dist/tweakpane.js"></script>
+  <!-- CodeMirror 5: lightweight in-browser JS editor -->
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.16/codemirror.min.css"/>
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.16/theme/dracula.min.css"/>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.16/codemirror.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.16/mode/javascript/javascript.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.16/addon/edit/matchbrackets.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.16/addon/edit/closebrackets.min.js"></script>
+
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      background: #0a0a0f;
+      color: #e2e8f0;
+      font-family: 'Segoe UI', system-ui, sans-serif;
+      height: 100vh;
+      display: flex;
+      flex-direction: column;
+      overflow: hidden;
+    }
+
+    /* ── HEADER ── */
+    #header {
+      background: #111827;
+      border-bottom: 1px solid #1e293b;
+      padding: 10px 20px;
+      display: flex;
+      align-items: center;
+      gap: 16px;
+      flex-shrink: 0;
+    }
+    #header h1 {
+      font-size: 18px;
+      font-weight: 700;
+      color: #38bdf8;
+      letter-spacing: 0.05em;
+    }
+    #header span {
+      font-size: 12px;
+      color: #64748b;
+    }
+    .header-spacer { flex: 1; }
+
+    /* ── TOOLBAR BUTTONS ── */
+    .btn {
+      padding: 6px 16px;
+      border-radius: 6px;
+      border: none;
+      font-size: 13px;
+      font-weight: 600;
+      cursor: pointer;
+      transition: all 0.15s;
+    }
+    .btn-run  { background: #22c55e; color: #000; }
+    .btn-run:hover  { background: #16a34a; }
+    .btn-stop { background: #ef4444; color: #fff; }
+    .btn-stop:hover { background: #dc2626; }
+    .btn-copy { background: #334155; color: #e2e8f0; }
+    .btn-copy:hover { background: #475569; }
+    .btn-clear { background: #1e293b; color: #94a3b8; border: 1px solid #334155; }
+    .btn-clear:hover { background: #334155; }
+    .btn-example { background: #7c3aed; color: #fff; }
+    .btn-example:hover { background: #6d28d9; }
+
+    /* ── MAIN LAYOUT ── */
+    #main {
+      display: flex;
+      flex: 1;
+      overflow: hidden;
+    }
+
+    /* ── LEFT PANEL: EDITOR ── */
+    #editor-panel {
+      width: 42%;
+      display: flex;
+      flex-direction: column;
+      border-right: 1px solid #1e293b;
+      min-width: 300px;
+    }
+    #editor-toolbar {
+      background: #111827;
+      padding: 8px 12px;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      border-bottom: 1px solid #1e293b;
+      font-size: 12px;
+      color: #64748b;
+    }
+    #editor-toolbar .label { margin-right: auto; }
+
+    .CodeMirror {
+      flex: 1;
+      height: 100%;
+      font-size: 13px;
+      line-height: 1.6;
+      font-family: 'JetBrains Mono', 'Fira Code', 'Cascadia Code', monospace;
+    }
+    .CodeMirror-scroll { height: 100%; }
+    #editor-wrap {
+      flex: 1;
+      overflow: hidden;
+      display: flex;
+      flex-direction: column;
+    }
+
+    /* ── RIGHT PANEL: PREVIEW ── */
+    #preview-panel {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      position: relative;
+      background: #0a0a0f;
+    }
+    #preview-toolbar {
+      background: #111827;
+      padding: 8px 12px;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      border-bottom: 1px solid #1e293b;
+      font-size: 12px;
+      color: #64748b;
+      flex-shrink: 0;
+    }
+    #canvas-container {
+      flex: 1;
+      overflow: auto;
+      display: flex;
+      align-items: flex-start;
+      justify-content: center;
+      padding: 16px;
+    }
+    #canvas-container canvas {
+      display: block;
+      box-shadow: 0 0 40px rgba(56,189,248,0.08);
+      border-radius: 4px;
+    }
+    #status-bar {
+      background: #111827;
+      padding: 5px 12px;
+      font-size: 11px;
+      color: #475569;
+      border-top: 1px solid #1e293b;
+      display: flex;
+      gap: 16px;
+      flex-shrink: 0;
+    }
+    #status-bar .status-ok  { color: #22c55e; }
+    #status-bar .status-err { color: #ef4444; }
+
+    /* ── CONSOLE PANE ── */
+    #console-panel {
+      height: 140px;
+      background: #0d1117;
+      border-top: 1px solid #1e293b;
+      overflow-y: auto;
+      padding: 8px 12px;
+      font-family: monospace;
+      font-size: 12px;
+      flex-shrink: 0;
+    }
+    #console-panel .log   { color: #94a3b8; }
+    #console-panel .error { color: #f87171; }
+    #console-panel .warn  { color: #fbbf24; }
+    #console-label {
+      background: #111827;
+      padding: 5px 12px;
+      font-size: 11px;
+      color: #475569;
+      border-top: 1px solid #1e293b;
+      border-bottom: 1px solid #1e293b;
+      flex-shrink: 0;
+    }
+
+    /* ── CHEATSHEET SIDEBAR (collapsible) ── */
+    #cheatsheet-toggle {
+      position: fixed;
+      right: 0; top: 50%;
+      transform: translateY(-50%);
+      background: #7c3aed;
+      color: #fff;
+      border: none;
+      padding: 8px 4px;
+      border-radius: 6px 0 0 6px;
+      cursor: pointer;
+      font-size: 11px;
+      writing-mode: vertical-lr;
+      letter-spacing: 1px;
+      z-index: 100;
+    }
+
+    /* ── KEYBOARD SHORTCUT BADGE ── */
+    .kbd {
+      background: #1e293b;
+      border: 1px solid #334155;
+      border-radius: 3px;
+      padding: 1px 5px;
+      font-family: monospace;
+      font-size: 11px;
+      color: #94a3b8;
+    }
+  </style>
+</head>
+<body>
+
+<!-- ── HEADER ── -->
+<div id="header">
+  <h1>⚡ VisLab</h1>
+  <span>Creative Coding Playground · q5.js + Tweakpane</span>
+  <div class="header-spacer"></div>
+  <button class="btn btn-example" onclick="loadExample()">Load Example</button>
+  <button class="btn btn-copy"    onclick="copyCode()">Copy Code</button>
+  <button class="btn btn-clear"   onclick="clearConsole()">Clear Console</button>
+  <button class="btn btn-stop"    onclick="stopSketch()">■ Stop</button>
+  <button class="btn btn-run"     onclick="runSketch()">▶ Run</button>
+</div>
+
+<!-- ── MAIN CONTENT ── -->
+<div id="main">
+
+  <!-- LEFT: CODE EDITOR -->
+  <div id="editor-panel">
+    <div id="editor-toolbar">
+      <span class="label">📝 Sketch Code</span>
+      <span class="kbd">Ctrl+Enter</span> to run
+    </div>
+    <div id="editor-wrap">
+      <textarea id="code-input"></textarea>
+    </div>
+    <div id="console-label">🖥 Console</div>
+    <div id="console-panel" id="console"></div>
+  </div>
+
+  <!-- RIGHT: CANVAS PREVIEW -->
+  <div id="preview-panel">
+    <div id="preview-toolbar">
+      <span>🎨 Preview</span>
+      <span style="margin-left:auto; color:#38bdf8" id="fps-display">fps: —</span>
+    </div>
+    <div id="canvas-container">
+      <div id="sketch-mount"></div>
+    </div>
+    <div id="status-bar">
+      <span id="status-msg">Ready — paste your sketch code and press Run</span>
+      <span id="status-size" style="margin-left:auto"></span>
+    </div>
+  </div>
+
+</div>
+
+<!-- ── THE FRAMEWORK PREAMBLE (invisible to user, auto-prepended) ── -->
+<script id="preamble-src" type="text/preamble">
+// ═══════════════════════════════════════════════════════
+//  VISLAB PREAMBLE v1.0  —  auto-loaded, do not edit
+//  Provides: StepManager, layout zones, Tweakpane helpers
+//  Libraries available: q5.js (p5-compatible), Tweakpane
+// ═══════════════════════════════════════════════════════
+
+// ── LAYOUT CONSTANTS (1024×1024 canvas) ──────────────────
+const LAYOUT = {
+  TITLE:   { x: 0,   y: 0,   w: 1024, h: 60  },
+  VIZ:     { x: 0,   y: 60,  w: 620,  h: 690 },
+  PANEL:   { x: 630, y: 60,  w: 394,  h: 690 },
+  CONTROLS:{ x: 0,   y: 760, w: 1024, h: 264 }
+};
+
+// ── STEP ACCENT COLORS ────────────────────────────────────
+const STEP_COLORS = ['#38bdf8','#4ade80','#f59e0b','#f472b6','#a78bfa'];
+
+// ── STEP MANAGER ─────────────────────────────────────────
+class StepManager {
+  constructor(steps) {
+    this.steps = steps;        // array of { title, body[], formula, hint }
+    this.current = 0;
+    this.targetAlpha = 255;
+    this.alpha = 0;
+  }
+  get step()  { return this.steps[this.current]; }
+  get color() { return STEP_COLORS[this.current % STEP_COLORS.length]; }
+  get count() { return this.steps.length; }
+
+  next() { if (this.current < this.steps.length-1) { this.current++; this.alpha = 0; } }
+  prev() { if (this.current > 0) { this.current--; this.alpha = 0; } }
+
+  // Call inside draw() — handles fade-in animation
+  update() { this.alpha = lerp(this.alpha, 255, 0.08); }
+
+  // Draw title bar + step dots
+  drawTitleBar(p) {
+    p.fill('#111827'); p.noStroke();
+    p.rect(0, 0, 1024, 60);
+    p.fill(this.color); p.noStroke();
+    p.textSize(20); p.textAlign(p.LEFT, p.CENTER); p.textStyle(p.BOLD);
+    p.text(this.step.title, 20, 30);
+    // Step dots
+    let dotX = 1024 - 30 - (this.count * 18);
+    for (let i = 0; i < this.count; i++) {
+      p.fill(i === this.current ? this.color : '#334155');
+      p.circle(dotX + i*18, 30, i === this.current ? 10 : 7);
+    }
+  }
+
+  // Draw explanation panel (right side)
+  drawPanel(p, extraLines) {
+    const c = LAYOUT.PANEL;
+    p.fill('#0d1117'); p.noStroke();
+    p.rect(c.x, c.y, c.w, c.h);
+    // Accent border
+    p.stroke(this.color); p.strokeWeight(3); p.noFill();
+    p.line(c.x+1, c.y, c.x+1, c.y+c.h);
+    p.noStroke();
+
+    // Step title (pseudo-bold)
+    p.fill(this.color);
+    p.textSize(17); p.textAlign(p.LEFT, p.TOP); p.textStyle(p.BOLD);
+    p.text(this.step.title, c.x+18, c.y+16);
+
+    // Body text with fade
+    p.fill(220, 220, 220, this.alpha);
+    p.textSize(13); p.textStyle(p.NORMAL);
+    let ty = c.y + 52;
+    const lines = [...(this.step.body || []), ...(extraLines || [])];
+    for (let line of lines) {
+      if (line.startsWith('!!')) {
+        p.fill(this.color);
+        p.text(line.slice(2), c.x+18, ty);
+        p.fill(220, 220, 220, this.alpha);
+      } else {
+        p.text(line, c.x+18, ty);
+      }
+      ty += 22;
+    }
+
+    // Formula box at bottom
+    if (this.step.formula) {
+      p.fill('#1e293b'); p.noStroke();
+      p.rect(c.x+14, c.y+c.h-70, c.w-28, 56, 8);
+      p.fill(this.color);
+      p.textSize(18); p.textAlign(p.CENTER, p.CENTER); p.textStyle(p.BOLD);
+      p.text(this.step.formula, c.x + c.w/2, c.y+c.h-42);
+    }
+  }
+
+  // Draw Prev/Next buttons at bottom (returns button rects for click handling)
+  drawNavButtons(p) {
+    const by = 920, bw = 130, bh = 44;
+    // Prev
+    p.fill(this.current>0 ? '#334155' : '#1e293b');
+    p.rect(20, by, bw, bh, 8);
+    p.fill(this.current>0 ? '#e2e8f0' : '#475569');
+    p.textSize(14); p.textAlign(p.CENTER, p.CENTER); p.textStyle(p.NORMAL);
+    p.text('← Prev Step', 20+bw/2, by+bh/2);
+    // Next
+    p.fill(this.current<this.count-1 ? this.color : '#1e293b');
+    p.rect(874, by, bw, bh, 8);
+    p.fill(this.current<this.count-1 ? '#000' : '#475569');
+    p.text('Next Step →', 874+bw/2, by+bh/2);
+
+    return {
+      prev: {x:20,     y:by, w:bw, h:bh},
+      next: {x:874,    y:by, w:bw, h:bh}
+    };
+  }
+}
+
+// ── TWEAKPANE FACTORY HELPERS ─────────────────────────────
+// Call these in setup() — they return reactive param objects
+
+function makePane(title) {
+  return new Tweakpane.Pane({ title: title || 'Controls' });
+}
+
+function addSlider(pane, params, key, options) {
+  // options: { min, max, step, label }
+  return pane.addBinding(params, key, options);
+}
+
+function addButton(pane, label, callback) {
+  return pane.addButton({ title: label }).on('click', callback);
+}
+
+// ── MOUSE PROBE HELPER ───────────────────────────────────
+function inZone(mx, my, zone) {
+  return mx > zone.x && mx < zone.x+zone.w &&
+         my > zone.y && my < zone.y+zone.h;
+}
+
+// ── IN-VIZ CROSSHAIR ────────────────────────────────────
+function drawCrosshair(p, mx, my) {
+  if (!inZone(mx, my, LAYOUT.VIZ)) return;
+  p.stroke(255,255,255,60); p.strokeWeight(1);
+  p.line(mx, LAYOUT.VIZ.y, mx, LAYOUT.VIZ.y+LAYOUT.VIZ.h);
+  p.line(LAYOUT.VIZ.x, my, LAYOUT.VIZ.x+LAYOUT.VIZ.w, my);
+  p.noStroke();
+}
+
+// ── GLOW EFFECT (layered low-alpha circles) ───────────────
+function drawGlow(p, x, y, r, col, alpha) {
+  p.noStroke();
+  for (let i = 3; i > 0; i--) {
+    p.fill(p.red(col), p.green(col), p.blue(col), alpha/i);
+    p.circle(x, y, r*i);
+  }
+}
+</script>
+
+<!-- ── EDITOR + RUNTIME LOGIC ── -->
+<script>
+  // ── Initialize CodeMirror ──────────────────────────────
+  const cm = CodeMirror.fromTextArea(document.getElementById('code-input'), {
+    mode: 'javascript',
+    theme: 'dracula',
+    lineNumbers: true,
+    matchBrackets: true,
+    autoCloseBrackets: true,
+    indentUnit: 2,
+    tabSize: 2,
+    lineWrapping: false,
+    extraKeys: {
+      'Ctrl-Enter': runSketch,
+      'Cmd-Enter':  runSketch
+    }
+  });
+
+  // Make editor fill its container
+  setTimeout(() => {
+    const wrap = document.getElementById('editor-wrap');
+    cm.setSize('100%', wrap.offsetHeight + 'px');
+  }, 50);
+  window.addEventListener('resize', () => {
+    const wrap = document.getElementById('editor-wrap');
+    cm.setSize('100%', wrap.offsetHeight + 'px');
+  });
+
+  // ── Console capture ────────────────────────────────────
+  const consoleEl = document.getElementById('console-panel');
+  function logToConsole(msg, type='log') {
+    const div = document.createElement('div');
+    div.className = type;
+    div.textContent = '> ' + msg;
+    consoleEl.appendChild(div);
+    consoleEl.scrollTop = consoleEl.scrollHeight;
+  }
+
+  // ── Sketch runtime state ───────────────────────────────
+  let currentSketchEl = null;
+  let tweakpaneInstance = null;
+  let fpsInterval = null;
+
+  function stopSketch() {
+    if (tweakpaneInstance) {
+      try { tweakpaneInstance.dispose(); } catch(e) {}
+      tweakpaneInstance = null;
+    }
+    const mount = document.getElementById('sketch-mount');
+    mount.innerHTML = '';
+    currentSketchEl = null;
+    clearInterval(fpsInterval);
+    document.getElementById('fps-display').textContent = 'fps: —';
+    document.getElementById('status-msg').textContent = 'Sketch stopped.';
+    document.getElementById('status-msg').className = '';
+    logToConsole('Sketch stopped.', 'warn');
+  }
+
+  function runSketch() {
+    stopSketch();
+    clearConsole();
+
+    const preamble = document.getElementById('preamble-src').textContent;
+    const userCode = cm.getValue();
+
+    // Count lines
+    const totalLines = userCode.split('\n').length;
+    document.getElementById('status-size').textContent = totalLines + ' lines';
+
+    const mount = document.getElementById('sketch-mount');
+
+    // Inject into iframe for isolation
+    const iframe = document.createElement('iframe');
+    iframe.style.cssText = 'border:none; display:block;';
+    iframe.width  = 1024;
+    iframe.height = 1024;
+    mount.appendChild(iframe);
+    currentSketchEl = iframe;
+
+    const doc = iframe.contentDocument;
+    doc.open();
+    doc.write(`<!DOCTYPE html><html><head>
+      <script src="https://q5js.org/q5.js"><\/script>
+      <script src="https://cdn.jsdelivr.net/npm/tweakpane@4/dist/tweakpane.js"><\/script>
+      <style>
+        body { margin:0; background:#0a0a0f; overflow:hidden; }
+        canvas { display:block; }
+        .tp-dfwv { position:fixed !important; bottom:16px !important; right:16px !important; top:auto !important; z-index:999; }
+      </style>
+    </head><body>
+      <script>
+        // Proxy console to parent
+        const _log = console.log.bind(console);
+        console.log   = (...a) => { window.parent.logToConsole(a.join(' '), 'log');   _log(...a); };
+        console.error = (...a) => { window.parent.logToConsole(a.join(' '), 'error'); };
+        console.warn  = (...a) => { window.parent.logToConsole(a.join(' '), 'warn');  };
+        window.onerror = (msg, src, line) => {
+          window.parent.logToConsole('Line ' + (line - PREAMBLE_LINES) + ': ' + msg, 'error');
+          window.parent.setStatus('Error on line ' + (line - PREAMBLE_LINES), true);
+          return true;
+        };
+        const PREAMBLE_LINES = ${preamble.split('\n').length};
+      <\/script>
+      <script>${preamble}<\/script>
+      <script>
+        try {
+          ${userCode}
+        } catch(e) {
+          console.error(e.message);
+        }
+      <\/script>
+    </body></html>`);
+    doc.close();
+
+    document.getElementById('status-msg').textContent = '✓ Running';
+    document.getElementById('status-msg').className = 'status-ok';
+    logToConsole('Sketch started — ' + totalLines + ' lines', 'log');
+
+    // FPS from iframe
+    fpsInterval = setInterval(() => {
+      try {
+        const fr = iframe.contentWindow?._q5_frameRate;
+        if (fr) document.getElementById('fps-display').textContent = 'fps: ' + Math.round(fr);
+      } catch(e) {}
+    }, 500);
+  }
+
+  function setStatus(msg, isError) {
+    const el = document.getElementById('status-msg');
+    el.textContent = msg;
+    el.className = isError ? 'status-err' : 'status-ok';
+  }
+  window.logToConsole = logToConsole;
+  window.setStatus = setStatus;
+
+  function clearConsole() {
+    document.getElementById('console-panel').innerHTML = '';
+  }
+
+  function copyCode() {
+    navigator.clipboard.writeText(cm.getValue());
+    logToConsole('Code copied to clipboard.', 'log');
+  }
+
+  // ── Keyboard shortcuts ─────────────────────────────────
+  document.addEventListener('keydown', e => {
+    if ((e.ctrlKey || e.metaKey) && e.key === 'Enter') runSketch();
+  });
+
+  // ── Load built-in Example ──────────────────────────────
+  function loadExample() {
+    cm.setValue(EXAMPLE_SKETCH);
+    logToConsole('Example loaded — press Run or Ctrl+Enter', 'log');
+  }
+
+  // ── EXAMPLE SKETCH (uses preamble, ~120 lines) ─────────
+  const EXAMPLE_SKETCH = `// ════════════════════════════════════════════
+//  WAVE INTERFERENCE — Example Sketch
+//  Uses VisLab preamble: StepManager, LAYOUT,
+//  Tweakpane helpers, drawCrosshair, drawGlow
+// ════════════════════════════════════════════
+
+// 1. Define steps — just content, no UI code needed
+const steps = new StepManager([
+  {
+    title: 'Step 1 — Single Wave',
+    body: [
+      'A wave is a repeating oscillation.',
+      'Drag the mouse over the viz to probe',
+      'the wave amplitude at any point.',
+      '!!Key idea: frequency controls cycles/sec.',
+      'Try the frequency slider below!'
+    ],
+    formula: 'y = A · sin(2π·f·x - t)'
+  },
+  {
+    title: 'Step 2 — Two Waves',
+    body: [
+      'Add a second wave with its own frequency.',
+      'When two waves meet, they add together.',
+      '!!This is called superposition.',
+      'Notice constructive & destructive zones.'
+    ],
+    formula: 'y = y₁ + y₂'
+  },
+  {
+    title: 'Step 3 — Interference Pattern',
+    body: [
+      'Move the mouse left/right to change',
+      'the phase offset between both waves.',
+      '!!Phase difference creates standing waves.',
+      'At 180° offset: complete cancellation!',
+      'This is how noise-cancelling works.'
+    ],
+    formula: 'Δφ = mouseX / vizWidth · 2π'
+  }
+]);
+
+// 2. Tweakpane params — the LLM only writes these
+const params = {
+  freq1:     2.0,
+  freq2:     3.0,
+  amplitude: 80
+};
+
+let pane, navBtns;
+
+function setup() {
+  createCanvas(1024, 1024);
+
+  // Tweakpane replaces ALL hand-drawn sliders
+  pane = makePane('Wave Controls');
+  addSlider(pane, params, 'freq1',     { min:0.5, max:10, step:0.1, label:'Freq 1 (Hz)' });
+  addSlider(pane, params, 'freq2',     { min:0.5, max:10, step:0.1, label:'Freq 2 (Hz)' });
+  addSlider(pane, params, 'amplitude', { min:10,  max:150, step:1, label:'Amplitude' });
+}
+
+function draw() {
+  background('#0a0a0f');
+  steps.update();
+
+  // ── Draw UI shell from preamble ──
+  steps.drawTitleBar(window);
+  navBtns = steps.drawNavButtons(window);
+  steps.drawPanel(window);
+
+  // ── Viz zone background ──
+  const vz = LAYOUT.VIZ;
+  fill('#0f0f1a'); noStroke();
+  rect(vz.x, vz.y, vz.w, vz.h);
+
+  // ── Mouse-controlled phase ──
+  const phase = inZone(mouseX, mouseY, vz)
+    ? map(mouseX, vz.x, vz.x+vz.w, 0, TWO_PI)
+    : 0;
+
+  const cx = vz.x + vz.w/2;
+  const cy = vz.y + vz.h/2;
+  const t  = frameCount * 0.03;
+
+  // Draw wave 1
+  stroke('#38bdf8'); strokeWeight(2.5); noFill();
+  beginShape();
+  for (let x = vz.x; x < vz.x + vz.w; x++) {
+    const xn = map(x, vz.x, vz.x+vz.w, 0, TWO_PI*params.freq1);
+    const y  = cy - params.amplitude * sin(xn - t);
+    vertex(x, y);
+  }
+  endShape();
+
+  if (steps.current >= 1) {
+    // Draw wave 2
+    stroke('#4ade80'); strokeWeight(2.5); noFill();
+    beginShape();
+    for (let x = vz.x; x < vz.x + vz.w; x++) {
+      const xn = map(x, vz.x, vz.x+vz.w, 0, TWO_PI*params.freq2);
+      const y  = cy - params.amplitude * sin(xn - t + phase);
+      vertex(x, y);
+    }
+    endShape();
+  }
+
+  if (steps.current >= 2) {
+    // Draw superposition
+    stroke('#f59e0b'); strokeWeight(3); noFill();
+    beginShape();
+    for (let x = vz.x; x < vz.x + vz.w; x++) {
+      const xn1 = map(x, vz.x, vz.x+vz.w, 0, TWO_PI*params.freq1);
+      const xn2 = map(x, vz.x, vz.x+vz.w, 0, TWO_PI*params.freq2);
+      const y1  = params.amplitude * sin(xn1 - t);
+      const y2  = params.amplitude * sin(xn2 - t + phase);
+      vertex(x, cy - (y1+y2)/2);
+    }
+    endShape();
+    // Labels
+    noStroke(); fill('#38bdf8'); textSize(12); textAlign(LEFT);
+    text('Wave 1', vz.x+8, vz.y+20);
+    fill('#4ade80'); text('Wave 2', vz.x+8, vz.y+36);
+    fill('#f59e0b'); text('Sum',    vz.x+8, vz.y+52);
+  }
+
+  // Crosshair from preamble
+  drawCrosshair(window, mouseX, mouseY);
+
+  // Glow on mouse in viz
+  if (inZone(mouseX, mouseY, vz)) {
+    drawGlow(window, mouseX, mouseY, 20, color(steps.color), 40);
+  }
+}
+
+function mousePressed() {
+  if (navBtns) {
+    const {prev, next} = navBtns;
+    if (mouseX > prev.x && mouseX < prev.x+prev.w &&
+        mouseY > prev.y && mouseY < prev.y+prev.h) steps.prev();
+    if (mouseX > next.x && mouseX < next.x+next.w &&
+        mouseY > next.y && mouseY < next.y+next.h) steps.next();
+  }
+}
+`;
+
+  // Auto-load example on first visit
+  loadExample();
+</script>
+</body>
+</html>
