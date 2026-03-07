@@ -20,6 +20,12 @@ No build step. No install. Open `index.html` and start coding.
   - [Sketch Patterns](#sketch-patterns)
   - [Tweakpane helpers](#tweakpane-helpers)
   - [Utility functions](#utility-functions)
+  - [HintSystem](#hintsystem)
+  - [ProbePoint](#probepoint)
+  - [formulaBox](#formulabox)
+  - [ColorRamp](#colorramp)
+  - [subPanel](#subpanel)
+  - [spanAnnotation](#spanannotation)
 - [Keyboard Shortcuts](#keyboard-shortcuts)
 - [Example Sketch](#example-sketch)
 - [Running Locally](#running-locally)
@@ -420,6 +426,261 @@ function setup() {
 | `safeGlow` | `(x, y, r, [r,g,b], alpha)` | Glow effect using an RGB array (no `p` instance needed) |
 
 ---
+
+### HintSystem
+
+A **ⓘ icon** sits in the top-right of the title bar at all times.  
+Clicking it slides down a semi-transparent overlay listing all registered hints. Clicking again dismisses it.
+
+```
+┌─────────────────────────────────────────────────[ⓘ]┐  ← title bar
+│ De Laval Rocket Nozzle                               │
+└──────────────────────────────────────────────────────┘
+
+[when ⓘ clicked]
+┌──────────────────────────────────────────────────────┐
+│  ⓘ  How to use this sketch                          │
+│  ● Click a milestone dot to jump to that concept     │
+│  ● Use sliders to change chamber pressure live        │
+│  ● Click the nozzle to probe local Mach number       │
+└──────────────────────────────────────────────────────┘
+```
+
+#### Constructor
+
+```js
+const hints = new HintSystem(opts);
+```
+
+| Option | Default | Description |
+|--------|---------|-------------|
+| `opts.ix` | `995` | X position of the ⓘ icon |
+| `opts.iy` | `30` | Y position of the ⓘ icon |
+| `opts.ir` | `14` | Radius of the icon circle |
+
+#### Methods
+
+| Method | Description |
+|--------|-------------|
+| `hints.register(hints[])` | Register the array of hint strings to show in the overlay |
+| `hints.draw(acRGB)` | Draw the icon (and overlay when open). Call in `draw()` after `ns.drawRail()`. |
+| `hints.hit(mx, my)` | Handle a mouse click — toggles the overlay or closes it. Call in `mousePressed()` before `ns.hit()`. Returns `true` if consumed. |
+
+#### Usage
+
+```js
+const hints = new HintSystem();
+
+// In setup():
+hints.register([
+  'Click a milestone dot to jump to that concept',
+  'Use sliders to change physics live',
+  'Click the nozzle diagram to probe local Mach number',
+]);
+
+// In draw(), after ns.drawRail():
+hints.draw(ns.acRGB);
+
+// In mousePressed(), before ns.hit():
+hints.hit(mouseX, mouseY);
+```
+
+---
+
+### ProbePoint
+
+Click anywhere on the visualisation to place a **callout bubble** showing a computed value at that position. A small **×** button on the bubble lets the user dismiss it without clicking elsewhere.
+
+#### Methods
+
+| Method | Description |
+|--------|-------------|
+| `probe.register(fn)` | Register `fn(x, y) → string` — the function that computes the label for any clicked point |
+| `probe.set(x, y)` | Place the probe at `(x, y)` and compute the label |
+| `probe.clear()` | Remove the probe |
+| `probe.draw(acRGB)` | Draw the anchor dot and callout. Call in `draw()`. |
+| `probe.hitClear(mx, my)` | Returns `true` if the × button was clicked. Call in `mousePressed()`. |
+
+#### Usage
+
+```js
+const probe = new ProbePoint();
+
+// Register once — outside draw():
+probe.register((x, y) => {
+  const t    = map(x, nozzleX, nozzleX + nozzleW, 0, 1);
+  const mach = t < 0.45
+    ? map(t, 0, 0.45, 0.1, 1.0)
+    : map(t, 0.45, 1.0, 1.0, 3.5);
+  return `Mach ${mach.toFixed(2)}  |  x = ${t.toFixed(2)}`;
+});
+
+// In draw():
+probe.draw(ns.acRGB);
+
+// In mousePressed():
+if      (probe.hitClear(mouseX, mouseY)) probe.clear();
+else if (!ns.hit(mouseX, mouseY))        probe.set(mouseX, mouseY);
+```
+
+---
+
+### formulaBox
+
+Draws a **formula bubble** placed directly on the diagram — not in the side panel. Supports an optional `sub` label rendered as a smaller explanation line beneath the formula.
+
+#### Signature
+
+```js
+formulaBox(x, y, formula, acRGB, opts = {})
+```
+
+| Parameter | Description |
+|-----------|-------------|
+| `x`, `y` | Centre of the box |
+| `formula` | Formula string to display |
+| `acRGB` | RGB array for the accent colour |
+| `opts.w` | Box width (default `260`) |
+| `opts.h` | Box height — ignored when `opts.sub` is set (default `32`) |
+| `opts.size` | Font size of the formula (default `13`) |
+| `opts.sub` | Optional sub-label string; if provided, the box is taller (`52px`) and the sub is rendered in a muted colour below the formula |
+
+#### Usage
+
+```js
+// Static formula
+formulaBox(512, 260, 'y = A · sin(ωt + φ)', acRGB);
+
+// Live computed values
+formulaBox(512, 260,
+  `Vs/Vp = Ns/Np  →  ${Vs.toFixed(0)}/${Vp} = ${Ns}/${Np}`,
+  acRGB, { w: 380 });
+
+// With sub-label
+formulaBox(512, 280,
+  `P = F / A  →  ${P.toFixed(1)} bar`,
+  acRGB,
+  { w: 280, sub: "Pascal's Law — pressure transmits equally in all directions" });
+```
+
+---
+
+### ColorRamp
+
+Maps a **0–1 value** to an RGB triple via defined colour stops. Ideal for continuous physical gradients — temperature, pressure, voltage, wavelength.
+
+#### Constructor
+
+```js
+const ramp = new ColorRamp(stops);
+```
+
+Each stop is `{ t, r, g, b }` where `t` is in `[0, 1]`.
+
+#### Methods
+
+| Method | Description |
+|--------|-------------|
+| `ramp.at(t)` | Returns `[r, g, b]` for the given `t` (clamped to `[0, 1]`) |
+
+#### Built-in presets (define in your sketch)
+
+```js
+const RAMP_HEAT = new ColorRamp([
+  { t: 0.0, r: 80,  g: 140, b: 255 },   // cold = blue
+  { t: 0.5, r: 255, g: 140, b: 20  },   // warm = orange
+  { t: 1.0, r: 255, g: 40,  b: 20  },   // hot  = red
+]);
+
+const RAMP_SPECTRUM = new ColorRamp([
+  { t: 0.0, r: 148, g: 0,   b: 211 },   // violet
+  { t: 0.2, r: 0,   g: 0,   b: 255 },   // blue
+  { t: 0.4, r: 0,   g: 200, b: 0   },   // green
+  { t: 0.6, r: 255, g: 255, b: 0   },   // yellow
+  { t: 0.8, r: 255, g: 127, b: 0   },   // orange
+  { t: 1.0, r: 255, g: 0,   b: 0   },   // red
+]);
+
+const RAMP_PRESSURE = new ColorRamp([
+  { t: 0.0, r: 56,  g: 189, b: 248 },   // low  = blue
+  { t: 0.5, r: 74,  g: 222, b: 128 },   // mid  = green
+  { t: 1.0, r: 248, g: 113, b: 113 },   // high = red
+]);
+```
+
+#### Usage
+
+```js
+// Colour by temperature
+const [r, g, b] = RAMP_HEAT.at(map(temp, 0, 3500, 0, 1));
+fill(r, g, b, 200);
+
+// Colour particles by position
+const [fr, fg, fb] = RAMP_HEAT.at(map(p.x, leftEdge, rightEdge, 0, 1));
+fill(fr, fg, fb, p.life);
+```
+
+---
+
+### subPanel
+
+Draws a **framed sub-panel** with a mini-title. Eliminates the repetitive background + border + title boilerplate in comparison sketches.
+
+#### Signature
+
+```js
+subPanel(x, y, w, h, title, rgb, opts = {})
+```
+
+| Option | Default | Description |
+|--------|---------|-------------|
+| `opts.radius` | `6` | Corner radius |
+| `opts.borderAlpha` | `55` | Alpha of the accent border |
+| `opts.titleAlpha` | `170` | Alpha of the mini-title text |
+| `opts.titleSize` | `12` | Font size of the mini-title |
+
+#### Usage
+
+```js
+// Two comparison panels side by side
+subPanel(20,  170, 490, 400, 'Disc Brake', hexRGB('#38bdf8'));
+subPanel(514, 170, 490, 400, 'Drum Brake', hexRGB('#f472b6'));
+```
+
+---
+
+### spanAnnotation
+
+Draws a **double-headed arrow** between two x-positions with a centred label above. Use for wavelength, piston stroke, bond length, turns count — any measurable span.
+
+#### Signature
+
+```js
+spanAnnotation(x1, x2, y, label, rgb, opts = {})
+```
+
+| Option | Default | Description |
+|--------|---------|-------------|
+| `opts.offset` | `0` | Vertical nudge applied to the arrow y position |
+| `opts.alpha` | `160` | Overall opacity |
+| `opts.weight` | `1.5` | Stroke weight of the arrow line |
+| `opts.size` | `11` | Font size of the label |
+
+#### Usage
+
+```js
+// Wavelength between two wave peaks
+spanAnnotation(peak1X, peak2X, cy + A + 40,
+  `λ = ${lam.toFixed(0)}px`, acRGB);
+
+// Piston stroke
+spanAnnotation(pistonTopY, pistonBotY, cx + 55,
+  `Stroke = ${stroke_mm}mm`, [245, 158, 11]);
+
+// Turns ratio
+spanAnnotation(CORE_X + CORE_T, CORE_X + CORE_T + 110,
+  `Np = ${Np}`, priRGB, { offset: 30 });
+```
 
 ## Keyboard Shortcuts
 
