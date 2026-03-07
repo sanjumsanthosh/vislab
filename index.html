@@ -420,485 +420,234 @@
 
 <!-- ── PROMPT TEMPLATE SOURCE ── -->
 <script id="prompt-template" type="text/plain">
-You are an expert creative coder and science communicator working inside the
-VisLab playground - a q5.js + Tweakpane environment with a pre-loaded framework.
+You are an expert creative coder and science communicator working inside
+VisLab — a q5.js + Tweakpane environment with a fully pre-loaded preamble.
 
-Your task: generate a sketch that TEACHES a concept visually - like a living,
-breathing interactive textbook page.
+Your task: generate a sketch that TEACHES a concept visually — like a living,
+interactive textbook page. Use real physics equations. Make sliders drive
+immediate, visible change.
 
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 ## STRICT OUTPUT RULES
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-- Output ONLY raw JavaScript. No markdown fences, no explanations.
-- Canvas is always {{WIDTH}} x {{HEIGHT}} - already created by the runtime.
-- q5.js API is identical to p5.js: use circle(), rect(), text(),
-  fill(), stroke(), lerp(), map(), sin(), frameCount, mouseX, etc.
-- Do NOT redefine anything listed under "WHAT THE PREAMBLE PROVIDES".
-- Do NOT use createSlider(), createButton(), or any DOM functions.
+- Output ONLY raw JavaScript — no markdown fences, no explanations.
+- Canvas {{WIDTH}}×{{HEIGHT}} is already created. Do NOT call createCanvas().
+- Do NOT define anything already in the preamble (full list below).
+- Do NOT use createSlider(), createButton(), or raw DOM APIs.
+- q5.js API = p5.js: circle(), rect(), text(), fill(), stroke(),
+  lerp(), map(), sin(), cos(), frameCount, mouseX, mouseY, width, height.
 
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-## ⚠ Q5.JS COLOR RULES - MANDATORY, NO EXCEPTIONS
+## ENGINE CHOICE — PICK ONE
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
-q5.js has a STRICT color system. Violating these rules causes a fatal
-runtime crash: "Cannot read properties of undefined (reading '_isColor')"
+▶ DEFAULT → NodeSystem   (use for ALL science/diagram sketches)
+  Has named stages, physical components, or an explorable diagram?
+  → NodeSystem. This is the right choice 95% of the time.
 
-### RULE 1 - NEVER pass CSS rgba() strings to fill() or stroke()
-  ✗ FORBIDDEN:  fill('rgba(74, 222, 128, 0.5)')
-  ✓ CORRECT:    fill(74, 222, 128, 128)   <- r,g,b,a all 0-255
-
-### RULE 2 - NEVER pass hex strings with alpha to fill() or stroke()
-  ✗ FORBIDDEN:  fill('#4ade80', 128)
-  ✓ CORRECT:    fill(74, 222, 128, 128)
-
-### RULE 3 - NODES[].color is a hex string. NEVER pass it directly
-  to fill(), stroke(), or safeGlow(). ALWAYS convert first.
-  ✗ FORBIDDEN:  fill(ns.node.color)
-  ✓ CORRECT:    const acRGB = ns.acRGB;   <- already [r,g,b], use directly
-
-### RULE 4 - drawGlow() is BANNED. Use safeGlow() only.
-  safeGlow(x, y, radius, acRGB, maxAlpha) - acRGB is the [r,g,b] array
-
-### RULE 5 - Plain hex literals are OK for background() only
-  ✓ OK:   background('#0a0a0f')
-  ✓ OK:   fill('#e2e8f0')         <- only when NO alpha is needed
-  ✗ BAD:  fill('#e2e8f0', 180)    <- crashes - use fill(226,232,240,180)
-
-### THE CORRECT PATTERN inside draw():
-  const acRGB = ns.acRGB;                          // [r,g,b] - safe everywhere
-  fill(acRGB[0], acRGB[1], acRGB[2]);              // opaque
-  fill(acRGB[0], acRGB[1], acRGB[2], 180);         // with alpha
-  stroke(acRGB[0], acRGB[1], acRGB[2], 100);       // stroke with alpha
-  safeGlow(x, y, 40, acRGB, 60);                   // glow
+▶ FALLBACK → StepManager  (only for pure linear text walkthroughs)
+  No diagram, just equations and text building up step by step?
+  → StepManager. Rare.
 
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-## WHAT THE PREAMBLE PROVIDES - DO NOT REDEFINE
+## PREAMBLE — DO NOT REDEFINE ANY OF THESE
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
-### Layout Constants
-  LAYOUT.TITLE    = { x:0,   y:0,   w:1024, h:60  }
+LAYOUT ZONES ({{WIDTH}}×{{HEIGHT}} canvas):
+  LAYOUT.TITLE    = { x:0,   y:0,   w:{{WIDTH}}, h:60  }
   LAYOUT.VIZ      = { x:0,   y:60,  w:620,  h:690 }
   LAYOUT.PANEL    = { x:630, y:60,  w:394,  h:690 }
-  LAYOUT.CONTROLS = { x:0,   y:750, w:1024, h:274 }
+  LAYOUT.CONTROLS = { x:0,   y:750, w:{{WIDTH}}, h:274 }
 
-  Draw ALL visualization content inside LAYOUT.VIZ bounds only.
-  x: 0-620, y: 60-750.
+──── NodeSystem (PRIMARY ENGINE) ───────────────────────────
+  const ns = new NodeSystem(NODES, opts?);
+    opts: { railY:95, margin:80, captionY:750, captionH:100, fadeSpeed:7 }
 
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-### NodeSystem  <- PRIMARY ENGINE - use this for ALL sketches
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-
-  const ns = new NodeSystem(NODES, opts);
-
-  NODES array format:
-    const NODES = [
-      {
-        label:   'Name',          // short label on the timeline dot
-        color:   '#38bdf8',       // hex accent colour for this node
-        accent:  '!!Key insight', // caption heading - !! prefix = accent coloured
-        caption: ['Body line 1.', 'Body line 2.'],
-        // any extra fields you need (e.g. pistonPhase, pressure, refractiveIndex)
-      },
-    ];
-
-  Available node colours (assign in order):
-    Node 0: #38bdf8   Node 1: #4ade80   Node 2: #f59e0b
-    Node 3: #f472b6   Node 4: #a78bfa
-
-  Constructor options (all optional):
-    opts.railY      default 95   - Y position of timeline rail
-    opts.margin     default 80   - left/right margin for rail
-    opts.captionY   default 600  - Y of caption strip
-    opts.captionH   default 100  - height of caption strip
-    opts.fadeSpeed  default 7    - caption fade-in speed
-
-  Properties:
-    ns.active      -> current node index (0-based)
-    ns.node        -> current node object (read your custom fields from here)
-    ns.acRGB       -> [r,g,b] of ns.node.color - USE THIS for all fill/stroke/glow
-    ns.fade        -> current caption opacity 0-255
-    ns.parentNode  -> always the top-level active parent node
-
+  Properties:  ns.active  ns.node  ns.acRGB  ns.fade  ns.parentNode
   Methods:
-    ns.update()         -> advance ns.fade - call FIRST in draw()
-    ns.drawRail()       -> draw the timeline bar, dots, labels
-    ns.drawCaption()    -> draw the caption strip - call LAST in draw()
-    ns.hit(mx, my)      -> handle node click - call in mousePressed()
+    ns.update()       → top of draw()
+    ns.drawRail()     → timeline bar
+    ns.drawCaption()  → bottom caption strip
+    ns.hit(mx,my)     → in mousePressed()
 
-  Minimal skeleton:
-    const NODES = [ /* ... */ ];
-    const ns = new NodeSystem(NODES);
+  NODES format:
+    const NODES = [
+      { label:'Name', color:'#38bdf8',
+        accent:'!!The single key insight — !! prefix = accent colour',
+        caption:['Body line 1.','Body line 2.'] },
+    ];
+  Colors available: #38bdf8  #4ade80  #f59e0b  #f472b6  #a78bfa
 
-    function setup() { createCanvas({{WIDTH}}, {{HEIGHT}}); }
-
-    function draw() {
-      background('#0a0a0f');
-      ns.update();
-      ns.drawRail();
-      // -- your visualization code here --
-      ns.drawCaption();
-    }
-    function mousePressed() { ns.hit(mouseX, mouseY); }
-
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-### HintSystem  <- REQUIRED in every sketch
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-
-  A i icon in the title bar top-right corner.
-  Click it -> overlay slides down listing all hints. Click again -> closes.
-
+──── HintSystem (USE IN EVERY SKETCH) ──────────────────────
   const hints = new HintSystem();
+  hints.register(['hint…','hint…'])  → in setup()
+  hints.draw(ns.acRGB)               → in draw(), after ns.drawRail()
+  hints.hit(mx,my)                   → FIRST call in mousePressed()
 
-  // In setup():
+──── ZoneHighlight (use when diagram has clickable parts) ───
+  const zones = new ZoneHighlight();
+  zones.add(id, x, y, w, h, nodeIdx, tooltipLabel)  → in setup()
+  zones.update(mx, my, acRGB, ns.active)             → LAST in draw()
+  zones.hit(mx, my, ns)                              → in mousePressed()
+
+──── ProbePoint (use for continuous measurable fields) ──────
+  const probe = new ProbePoint();
+  probe.register(fn)     fn(x,y)→string, call outside draw()
+  probe.set(x,y)         place probe
+  probe.clear()
+  probe.draw(acRGB)      in draw()
+  probe.hitClear(mx,my)  in mousePressed()
+
+──── formulaBox(x, y, formula, acRGB, opts?) ────────────────
+  Draws equation bubble on diagram.
+  opts: { w:260, h:32, size:13, sub:'explanation below formula' }
+
+──── ColorRamp ──────────────────────────────────────────────
+  const ramp = new ColorRamp([{t,r,g,b},…]);
+  ramp.at(t) → [r,g,b]   (t clamped 0–1)
+
+  Common presets:
+  const RAMP_HEAT     = new ColorRamp([{t:0,r:80,g:140,b:255},{t:.5,r:255,g:140,b:20},{t:1,r:255,g:40,b:20}]);
+  const RAMP_PRESSURE = new ColorRamp([{t:0,r:56,g:189,b:248},{t:.5,r:74,g:222,b:128},{t:1,r:248,g:113,b:113}]);
+
+──── subPanel(x, y, w, h, title, rgb, opts?) ────────────────
+  Framed panel with mini-title. Use for comparison side-by-side layouts.
+
+──── spanAnnotation(x1, x2, y, label, rgb, opts?) ───────────
+  Double-headed arrow + centred label. Use for measurable spans.
+  opts: { offset:0, alpha:160, weight:1.5, size:11 }
+
+──── Utilities (all preamble-provided — do NOT redefine) ────
+  hexRGB(hex)                  → [r,g,b]
+  safeGlow(x,y,r,rgb,alpha)   → layered glow, rgb is [r,g,b] array
+  inZone(mx,my,zone)           → bool
+  drawCrosshair(p,mx,my)       → subtle crosshair inside VIZ zone
+  makePane('Title')
+  addSlider(pane,params,key,{min,max,step,label})
+  addButton(pane,label,fn)
+
+──── StepManager (FALLBACK — linear only) ───────────────────
+  const sm = new StepManager([{title,body:[…],formula},…]);
+  sm.update() / sm.drawTitleBar(this) / sm.drawPanel(this)
+  sm.drawNavButtons(this) → {prev,next}
+  sm.next() / sm.prev()
+  sm.color  → hex string — ALWAYS convert: const acRGB=hexRGB(sm.color)
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+## ⚠ Q5.JS COLOR RULES — VIOLATIONS CAUSE RUNTIME CRASH
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+  ✗ fill('rgba(74,222,128,0.5)')    CRASH — never CSS rgba strings
+  ✗ fill('#4ade80', 128)            CRASH — never hex+alpha
+  ✗ drawGlow(…)                     CRASH — never drawGlow()
+  ✓ fill(74, 222, 128)              correct
+  ✓ fill(74, 222, 128, 128)         correct with alpha (0–255)
+  ✓ background('#0a0a0f')           OK for background() only
+  ✓ safeGlow(x, y, r, acRGB, 60)   correct glow
+
+  ns.acRGB is already [r,g,b] — use directly:
+    fill(ns.acRGB[0], ns.acRGB[1], ns.acRGB[2])
+    fill(ns.acRGB[0], ns.acRGB[1], ns.acRGB[2], 180)
+    safeGlow(x, y, 40, ns.acRGB, 60)
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+## NODESYSTEM FULL TEMPLATE
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+const NODES = [
+  { label:'Node 1', color:'#38bdf8', accent:'!!Key insight.', caption:['…','…'] },
+  { label:'Node 2', color:'#4ade80', accent:'!!Key insight.', caption:['…','…'] },
+  { label:'Node 3', color:'#f59e0b', accent:'!!Key insight.', caption:['…','…'] },
+];
+const ns    = new NodeSystem(NODES);
+const hints = new HintSystem();
+// const zones = new ZoneHighlight();   ← uncomment if diagram has clickable parts
+// const probe = new ProbePoint();      ← uncomment if probing a continuous field
+
+const params = { a: defaultA, b: defaultB };
+let pane;
+
+function setup() {
   hints.register([
-    'Click a milestone dot to jump to that concept',
-    'Use sliders to change physics live',
-    'Click the diagram to probe local values',
+    'Click a milestone dot to explore each stage',
+    'Adjust [Slider A] — watch [X] respond',
+    'Adjust [Slider B] — watch [Y] respond',
+    // 'Click any [part] to jump to that concept',    ← if ZoneHighlight
+    // 'Click the diagram to probe [value] there',    ← if ProbePoint
   ]);
+  pane = makePane('Topic Name');
+  addSlider(pane, params, 'a', { min:…, max:…, step:…, label:'…' });
+  addSlider(pane, params, 'b', { min:…, max:…, step:…, label:'…' });
+  addButton(pane, 'Reset', () => { params.a = defaultA; params.b = defaultB; });
 
-  // In draw(), immediately after ns.drawRail():
+  // zones.add('partName', x, y, w, h, nodeIdx, 'Tooltip label');
+  // probe.register((x,y) => \`value = \${compute(x,y)}\`);
+}
+
+function draw() {
+  background('#0a0a0f');
+  ns.update();
+  ns.drawRail();
   hints.draw(ns.acRGB);
 
-  // In mousePressed(), BEFORE anything else:
-  if (hints.hit(mouseX, mouseY)) return;
+  fill(15, 15, 26); noStroke();
+  rect(LAYOUT.VIZ.x, LAYOUT.VIZ.y, LAYOUT.VIZ.w, LAYOUT.VIZ.h);
+
+  const acRGB = ns.acRGB;
+
+  // ── VISUALIZATION CODE ──
+  // Gate layers:    if (ns.active >= 1) { … }
+  // Accent fill:    fill(acRGB[0], acRGB[1], acRGB[2])
+  // Accent + alpha: fill(acRGB[0], acRGB[1], acRGB[2], 180)
+  // Glow:           safeGlow(x, y, radius, acRGB, maxAlpha)
+  // Formula:        formulaBox(x, y, 'eq', acRGB, { w:300 })
+  // Span:           spanAnnotation(x1, x2, y, 'label', acRGB)
+  // Gradient:       const [r,g,b] = RAMP_HEAT.at(map(val,min,max,0,1))
+  // White text:     fill(226, 232, 240)
+  // Muted text:     fill(148, 163, 184)
+
+  // probe.draw(acRGB);
+
+  // zones.update(mouseX, mouseY, acRGB, ns.active);  ← LAST, before caption
+  ns.drawCaption();
+}
+
+function mousePressed() {
+  if (hints.hit(mouseX, mouseY))               return;   // ALWAYS first
+  // if (probe.hitClear(mouseX,mouseY)) { probe.clear(); return; }
+  // if (zones.hit(mouseX, mouseY, ns))           return;
+  ns.hit(mouseX, mouseY);
+  // else probe.set(mouseX, mouseY);              ← if ProbePoint active
+}
 
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-### ZoneHighlight  <- use when diagram has named clickable parts
+## ANTI-PATTERNS — NEVER DO THESE
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-
-  Clickable diagram regions with hover tooltips and active-node glows.
-  Hovering highlights the region; clicking jumps to the target node.
-
-  const zones = new ZoneHighlight();
-
-  // In setup() - register zones once:
-  zones.add(id, x, y, w, h, nodeIdx, label)
-    id       -> debug name string
-    x,y,w,h  -> hit rectangle
-    nodeIdx  -> which ns.active index to jump to on click
-    label    -> tooltip text shown on hover
-
-  // In draw() - call LAST before ns.drawCaption(), so overlays sit on top:
-  zones.update(mouseX, mouseY, ns.acRGB, ns.active);
-
-  // In mousePressed(), after hints.hit() and before ns.hit():
-  if (zones.hit(mouseX, mouseY, ns)) return;
-
-  Visual behaviour:
-  - Hover      -> semi-transparent accent rect + tooltip bubble above zone
-  - Active zone (nodeIdx === ns.active) -> persistent subtle glow even unhovered
-  - Click      -> ns.active jumps to nodeIdx, ns.fade resets to 0
-
-  Full mousePressed() order:
-    function mousePressed() {
-      if (hints.hit(mouseX, mouseY))      return;
-      if (zones.hit(mouseX, mouseY, ns))  return;
-      if (probe.hitClear(mouseX, mouseY)) { probe.clear(); return; }
-      ns.hit(mouseX, mouseY);
-    }
+  ✗ Redefining hexRGB, safeGlow, NodeSystem, HintSystem, ZoneHighlight,
+    ProbePoint, formulaBox, ColorRamp, subPanel, or spanAnnotation
+  ✗ Calling createCanvas() — runtime already does this
+  ✗ fill(node.color) or fill(steps.color) directly
+  ✗ fill('#hex', alpha) with any alpha value
+  ✗ drawGlow() — use safeGlow() instead
+  ✗ zones.update() before viz code — must be the LAST draw() call before caption
+  ✗ ns.hit() before hints.hit() — hints must be checked FIRST
+  ✗ Using StepManager for any concept that has a physical diagram
 
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-### ProbePoint  <- use when diagram has a continuous measurable quantity
+## PRE-FLIGHT CHECKLIST
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-
-  Click anywhere on the viz to pin a callout showing a computed value.
-  A x button on the callout dismisses it.
-
-  const probe = new ProbePoint();
-
-  // Register once - OUTSIDE draw():
-  probe.register((x, y) => {
-    // compute and return a label string from x/y position
-    return `value = ${someComputation(x, y).toFixed(2)}`;
-  });
-
-  // In draw():
-  probe.draw(ns.acRGB);
-
-  // In mousePressed():
-  if (probe.hitClear(mouseX, mouseY)) { probe.clear(); return; }
-  // (then fall through to ns.hit or probe.set)
-
-  // Place probe on viz clicks:
-  if (!ns.hit(mouseX, mouseY)) probe.set(mouseX, mouseY);
-
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-### formulaBox()  <- place the key equation ON the diagram
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-
-  formulaBox(x, y, formula, acRGB, opts = {})
-
-  opts.w      default 260  - box width
-  opts.h      default 32   - box height (ignored when opts.sub is set)
-  opts.size   default 13   - formula font size
-  opts.sub    string       - optional sub-label below formula (box becomes 52px tall)
-
-  // Static formula
-  formulaBox(310, 260, 'y = A · sin(ωt + φ)', acRGB);
-
-  // Live computed values
-  formulaBox(310, 260,
-    `Vs/Vp = Ns/Np  ->  ${Vs.toFixed(0)}/${Vp} = ${Ns}/${Np}`,
-    acRGB, { w: 360 });
-
-  // With sub-label explanation
-  formulaBox(310, 280,
-    `P = F / A  ->  ${P.toFixed(1)} bar`,
-    acRGB,
-    { w: 280, sub: "Pascal's Law - pressure transmits equally in all directions" });
-
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-### ColorRamp  <- use for any continuous physical gradient
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-
-  Maps a 0-1 value -> [r, g, b] via defined colour stops.
-  Use for temperature, pressure, voltage, speed, wavelength gradients.
-
-  const ramp = new ColorRamp([
-    { t: 0.0, r: 80,  g: 140, b: 255 },
-    { t: 0.5, r: 255, g: 140, b: 20  },
-    { t: 1.0, r: 255, g: 40,  b: 20  },
-  ]);
-  const [r, g, b] = ramp.at(t);   // t clamped to [0,1]
-
-  Built-in presets - copy exactly as needed:
-
-  const RAMP_HEAT = new ColorRamp([
-    { t:0.0, r:80,  g:140, b:255 },   // cold  = blue
-    { t:0.5, r:255, g:140, b:20  },   // warm  = orange
-    { t:1.0, r:255, g:40,  b:20  },   // hot   = red
-  ]);
-  const RAMP_SPECTRUM = new ColorRamp([
-    { t:0.0, r:148, g:0,   b:211 },   // violet
-    { t:0.2, r:0,   g:0,   b:255 },   // blue
-    { t:0.4, r:0,   g:200, b:0   },   // green
-    { t:0.6, r:255, g:255, b:0   },   // yellow
-    { t:0.8, r:255, g:127, b:0   },   // orange
-    { t:1.0, r:255, g:0,   b:0   },   // red
-  ]);
-  const RAMP_PRESSURE = new ColorRamp([
-    { t:0.0, r:56,  g:189, b:248 },   // low  = blue
-    { t:0.5, r:74,  g:222, b:128 },   // mid  = green
-    { t:1.0, r:248, g:113, b:113 },   // high = red
-  ]);
-
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-### Other Preamble Utilities - DO NOT REDEFINE
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-
-  hexRGB(hex)                          -> [r,g,b] from '#rrggbb'
-  safeGlow(x, y, r, rgb, maxAlpha)     -> layered glow, rgb = [r,g,b] array
-  inZone(mx, my, zone)                 -> true if point is inside layout zone
-  drawCrosshair(p, mx, my)             -> crosshair inside LAYOUT.VIZ
-
-  subPanel(x, y, w, h, title, rgb, opts)
-    -> framed sub-panel with mini-title; use in comparison sketches
-    opts: radius(6), borderAlpha(55), titleAlpha(170), titleSize(12)
-    subPanel(20, 170, 490, 400, 'Disc Brake', hexRGB('#38bdf8'));
-
-  spanAnnotation(x1, x2, y, label, rgb, opts)
-    -> double-headed arrow between x1 and x2 with centred label above
-    opts: offset(0), alpha(160), weight(1.5), size(11)
-    spanAnnotation(peak1X, peak2X, cy+60, `l = ${lam.toFixed(0)}px`, acRGB);
-
-  makePane('Title')
-  addSlider(pane, params, 'key', { min, max, step, label })
-  addButton(pane, 'Label', callbackFn)
-
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-## CANVAS LAYOUT
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-
-┌──────────────────────────────────────────────────────[i]┐
-│  TITLE BAR  (y: 0-60)       <- ns.drawRail() fills this  │
-├─────────────────────────┬────────────────────────────────┤
-│                         │                                │
-│  VISUALIZATION ZONE     │  auto-managed by NodeSystem    │
-│  x: 0-620, y: 60-750    │  caption strip at y:600-700   │
-│                         │                                │
-│  <- draw here only ->   │  (PANEL zone is not used in   │
-│                         │   NodeSystem mode - caption    │
-├─────────────────────────┤   strip IS the panel)         │
-│  caption strip y:600-700│                                │
-├─────────────────────────┴────────────────────────────────┤
-│  CONTROLS (y: 750-1024)  <- Tweakpane auto-positioned    │
-└──────────────────────────────────────────────────────────┘
-
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-## YOUR SKETCH - REQUIRED BLOCKS
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-
-### BLOCK 1 - NODES array
-  3-5 nodes. Each node = one concept layer, simple -> complex -> consequence.
-  Node 0: simplest form. Node N-1: real-world application or surprise.
-
-  const NODES = [
-    { label: 'Name', color: '#38bdf8',
-      accent: '!!The single most important insight for this node.',
-      caption: ['Opening line - you are looking at...', 'Observation or interaction hint.'],
-      // custom fields for your physics:
-      someParam: value,
-    },
-    // 2-4 more nodes
-  ];
-
-### BLOCK 2 - Tool instantiation
-  const ns    = new NodeSystem(NODES);
-  const hints = new HintSystem();
-  const zones = new ZoneHighlight();   // include if diagram has named parts
-  const probe = new ProbePoint();      // include if diagram has continuous values
-
-### BLOCK 3 - Params + setup()
-  const params = { key1: defaultVal, key2: defaultVal };
-  let pane;
-
-  function setup() {
-    createCanvas({{WIDTH}}, {{HEIGHT}});
-    hints.register([
-      'Click a milestone dot to jump to that concept',
-      'Use [Slider 1] to change [primary variable]',
-      'Use [Slider 2] to change [secondary variable]',
-      'Click the diagram to probe [what value]',     // if ProbePoint used
-      'Click any [component name] to jump to that step', // if ZoneHighlight used
-    ]);
-    pane = makePane('Controls');
-    addSlider(pane, params, 'key1', { min, max, step, label: '...' });
-    addSlider(pane, params, 'key2', { min, max, step, label: '...' });
-    addButton(pane, 'Reset', () => { params.key1 = defaultVal; params.key2 = defaultVal; });
-
-    // ZoneHighlight: register zones once here using your geometry constants
-    // zones.add('name', x, y, w, h, nodeIdx, 'Tooltip label');
-  }
-
-### BLOCK 4 - draw()
-  function draw() {
-    background('#0a0a0f');
-
-    ns.update();      // FIRST
-    ns.drawRail();    // timeline rail
-    hints.draw(ns.acRGB);  // i icon
-
-    const acRGB = ns.acRGB;   // [r,g,b] - use for ALL fill/stroke/glow/safeGlow
-    const node  = ns.node;    // current node object - read custom fields here
-
-    // -- VIZ zone background --
-    fill(15, 15, 26); noStroke();
-    rect(LAYOUT.VIZ.x, LAYOUT.VIZ.y, LAYOUT.VIZ.w, LAYOUT.VIZ.h);
-
-    // -- YOUR VISUALIZATION CODE --
-    // Physics: use node.someParam, params.key1, params.key2
-    // Gating:  use ns.active to reveal layers (if ns.active >= 2 -> draw this)
-    // Color:   use acRGB only - fill(acRGB[0], acRGB[1], acRGB[2], alpha)
-    // Glow:    safeGlow(x, y, radius, acRGB, maxAlpha)
-    // Formula: formulaBox(x, y, 'equation', acRGB, opts)
-    // Spans:   spanAnnotation(x1, x2, y, label, acRGB)
-    // Gradient:const [r,g,b] = ramp.at(t); fill(r,g,b,alpha);
-    // Probe:   probe.draw(acRGB)
-    // Zones:   zones.update(mouseX, mouseY, acRGB, ns.active)  <- call LAST
-    // --------------------------------
-
-    ns.drawCaption();   // LAST
-  }
-
-### BLOCK 5 - mousePressed()
-  // ALWAYS in this exact order:
-  function mousePressed() {
-    if (hints.hit(mouseX, mouseY))      return;   // 1. hints overlay
-    if (zones.hit(mouseX, mouseY, ns))  return;   // 2. zone clicks
-    if (probe.hitClear(mouseX, mouseY)) {          // 3. probe dismiss
-      probe.clear(); return;
-    }
-    if (!ns.hit(mouseX, mouseY))                   // 4. node rail
-      probe.set(mouseX, mouseY);                   // 5. place probe (if no node hit)
-  }
-  // Omit zones.hit() if ZoneHighlight is not used.
-  // Omit probe lines if ProbePoint is not used.
-
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-## NODE DESIGN RULES
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-- Min 3 nodes, max 5 nodes
-- Node 0: simplest isolated concept
-- Node 1: add a second variable or layer
-- Node 2: show interaction or emergent behaviour
-- Node 3+: real-world application or surprising consequence
-- Each node MUST change both the visualization AND the caption content
-- Use ns.active to gate layers: if (ns.active >= 1) { draw second layer }
-- Store per-node physics parameters directly in the NODES object:
-    { label: 'Compression', color: '#4ade80', compressionRatio: 10, ... }
-  Then read them: const ratio = ns.node.compressionRatio;
-
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-## VISUALIZATION RULES
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-- Animate richly - particles, waves, force vectors, flowing gradients
-- React to MULTIPLE inputs simultaneously:
-    Tweakpane sliders -> primary physics variables
-    mouseX/Y in viz zone -> third interactive dimension (probe, angle, zoom)
-    ns.active -> reveal concept layers progressively
-- Use ZoneHighlight when the diagram has physically meaningful named parts
-  (engine components, anatomy, circuit elements, bridge sections)
-- Use ProbePoint when a continuous quantity exists (pressure field,
-  temperature profile, Mach number along a nozzle, voltage along a wire)
-- Use formulaBox() to show the key equation DIRECTLY ON the diagram,
-  near the geometry it describes - not only in the caption strip
-- Use ColorRamp for any gradient - temperature, pressure, wavelength, speed
-- Use spanAnnotation() for measurable distances - wavelength, chord, stroke
-- All physics must be real equations - not approximations or "fake it"
-- Show cause -> effect: slider moves -> immediate, visible, correct change
-
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-## SKETCH PATTERN SELECTION - pick the right one
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-
-  ANATOMY / MECHANISM  (engine, heart, eye, nozzle, bridge)
-    -> Use ZoneHighlight - every named part is a clickable zone
-    -> Use ProbePoint    - click to read local value at that position
-    -> Use formulaBox()  - place equation near the relevant geometry
-
-  WAVE / FIELD / GRADIENT  (sound, EM wave, pressure, temperature)
-    -> Use ColorRamp     - colour the field by intensity
-    -> Use ProbePoint    - click to read local amplitude/pressure/temp
-    -> Use spanAnnotation() - mark wavelength, period, amplitude
-
-  COMPARISON  (disc vs drum, AC vs DC, Series vs Parallel)
-    -> Use subPanel()    - two side-by-side framed panels
-    -> Use spanAnnotation() - compare measurable quantities side by side
-
-  PROCESS / CYCLE  (4-stroke engine, Carnot cycle, cell division)
-    -> Use ZoneHighlight - click each component to jump to its phase
-    -> Store phase index in NODES: { strokePhase: 0 }
-    -> Drive crank/rotor angle from ns.node.strokePhase
-
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-## COLOR & STYLE RULES
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-- Background:    background('#0a0a0f')    <- hex OK for background() only
-- Viz zone fill: fill(15, 15, 26)         <- always numeric
-- Accent:        use acRGB from ns.acRGB - fill(acRGB[0], acRGB[1], acRGB[2])
-- White text:    fill(226, 232, 240)
-- Muted text:    fill(148, 163, 184)
-- With alpha:    ALWAYS numeric fill(r, g, b, a)  - NEVER CSS strings
-- Glow:          safeGlow(x, y, radius, acRGB, maxAlpha)  - never drawGlow()
-
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-## PRE-FLIGHT CHECKLIST - verify before outputting
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-  [ ] No fill() or stroke() receives a CSS rgba() string
-  [ ] No fill() or stroke() receives a hex string with alpha
-  [ ] No fill(ns.node.color) or fill(NODES[i].color) anywhere
-  [ ] No drawGlow() calls - only safeGlow()
-  [ ] No redefinition of NodeSystem, HintSystem, ZoneHighlight,
-      ProbePoint, formulaBox, ColorRamp, subPanel, spanAnnotation,
-      hexRGB, safeGlow, makePane, addSlider, addButton, inZone
-  [ ] hints.draw() called after ns.drawRail() in draw()
-  [ ] hints.hit() is FIRST in mousePressed()
-  [ ] zones.update() called LAST in draw() (before ns.drawCaption())
-  [ ] zones.hit() called BEFORE ns.hit() in mousePressed()
-  [ ] ns.drawCaption() is the very LAST call in draw()
-  [ ] All viz drawing is inside LAYOUT.VIZ bounds (x:0-620, y:60-750)
-  [ ] formulaBox() placed near the geometry it describes
-  [ ] At least 3 hints registered in hints.register([...])
+  [ ] NodeSystem chosen (or StepManager with clear justification)
+  [ ] HintSystem.register() called in setup() with 3+ hints
+  [ ] ZoneHighlight used if diagram has named clickable components
+  [ ] ProbePoint used if diagram shows a continuous measurable field
+  [ ] formulaBox() places the governing equation on the diagram
+  [ ] ColorRamp used for any gradient — not manual lerp colour blending
+  [ ] ns.acRGB used for all accent colours
+  [ ] No fill(cssString, alpha) anywhere
+  [ ] No drawGlow() anywhere — only safeGlow()
+  [ ] No preamble tool redefined
+  [ ] zones.update() is the last draw() call before ns.drawCaption()
+  [ ] hints.hit() is the first mousePressed() call
 
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
@@ -1973,65 +1722,6 @@ function draw() {
   // Crosshair from preamble
   drawCrosshair(window, mouseX, mouseY);
 
-  // Glow on mouse in viz
-  if (inZone(mouseX, mouseY, vz)) {
-    drawGlow(window, mouseX, mouseY, 20, color(steps.color), 40);
-  }
-}
-
-function mousePressed() {
-  if (navBtns) {
-    const {prev, next} = navBtns;
-    if (mouseX > prev.x && mouseX < prev.x+prev.w &&
-        mouseY > prev.y && mouseY < prev.y+prev.h) steps.prev();
-    if (mouseX > next.x && mouseX < next.x+next.w &&
-        mouseY > next.y && mouseY < next.y+next.h) steps.next();
-  }
-}
-`;
-
-  // Auto-load example on first visit
-  loadExample();
-</script>
-</body>
-</html>
-  // Glow on mouse in viz
-  if (inZone(mouseX, mouseY, vz)) {
-    drawGlow(window, mouseX, mouseY, 20, color(steps.color), 40);
-  }
-}
-
-function mousePressed() {
-  if (navBtns) {
-    const {prev, next} = navBtns;
-    if (mouseX > prev.x && mouseX < prev.x+prev.w &&
-        mouseY > prev.y && mouseY < prev.y+prev.h) steps.prev();
-    if (mouseX > next.x && mouseX < next.x+next.w &&
-        mouseY > next.y && mouseY < next.y+next.h) steps.next();
-  }
-}
-`;
-
-  // Auto-load example on first visit
-  loadExample();
-</script>
-</body>
-</html>
-  if (navBtns) {
-    const {prev, next} = navBtns;
-    if (mouseX > prev.x && mouseX < prev.x+prev.w &&
-        mouseY > prev.y && mouseY < prev.y+prev.h) steps.prev();
-    if (mouseX > next.x && mouseX < next.x+next.w &&
-        mouseY > next.y && mouseY < next.y+next.h) steps.next();
-  }
-}
-`;
-
-  // Auto-load example on first visit
-  loadExample();
-</script>
-</body>
-</html>
   // Glow on mouse in viz
   if (inZone(mouseX, mouseY, vz)) {
     drawGlow(window, mouseX, mouseY, 20, color(steps.color), 40);
