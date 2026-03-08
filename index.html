@@ -1,8 +1,9 @@
 <!DOCTYPE html>
 <html lang="en">
+
 <head>
   <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>VisLab — Creative Coding Playground</title>
 
   <!-- ── CDN DEPENDENCIES ── -->
@@ -11,15 +12,19 @@
   <!-- Tweakpane: built-in sliders, buttons, color pickers (v3 UMD for iframe compatibility) -->
   <script src="https://cdn.jsdelivr.net/npm/tweakpane@3/dist/tweakpane.js"></script>
   <!-- CodeMirror 5: lightweight in-browser JS editor -->
-  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.16/codemirror.min.css"/>
-  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.16/theme/dracula.min.css"/>
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.16/codemirror.min.css" />
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.16/theme/dracula.min.css" />
   <script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.16/codemirror.min.js"></script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.16/mode/javascript/javascript.min.js"></script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.16/addon/edit/matchbrackets.min.js"></script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.16/addon/edit/closebrackets.min.js"></script>
 
   <style>
-    * { box-sizing: border-box; margin: 0; padding: 0; }
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
 
     body {
       background: #0a0a0f;
@@ -41,17 +46,22 @@
       gap: 16px;
       flex-shrink: 0;
     }
+
     #header h1 {
       font-size: 18px;
       font-weight: 700;
       color: #38bdf8;
       letter-spacing: 0.05em;
     }
+
     #header span {
       font-size: 12px;
       color: #64748b;
     }
-    .header-spacer { flex: 1; }
+
+    .header-spacer {
+      flex: 1;
+    }
 
     /* ── TOOLBAR BUTTONS ── */
     .btn {
@@ -63,16 +73,52 @@
       cursor: pointer;
       transition: all 0.15s;
     }
-    .btn-run  { background: #22c55e; color: #000; }
-    .btn-run:hover  { background: #16a34a; }
-    .btn-stop { background: #ef4444; color: #fff; }
-    .btn-stop:hover { background: #dc2626; }
-    .btn-copy { background: #334155; color: #e2e8f0; }
-    .btn-copy:hover { background: #475569; }
-    .btn-clear { background: #1e293b; color: #94a3b8; border: 1px solid #334155; }
-    .btn-clear:hover { background: #334155; }
-    .btn-example { background: #7c3aed; color: #fff; }
-    .btn-example:hover { background: #6d28d9; }
+
+    .btn-run {
+      background: #22c55e;
+      color: #000;
+    }
+
+    .btn-run:hover {
+      background: #16a34a;
+    }
+
+    .btn-stop {
+      background: #ef4444;
+      color: #fff;
+    }
+
+    .btn-stop:hover {
+      background: #dc2626;
+    }
+
+    .btn-copy {
+      background: #334155;
+      color: #e2e8f0;
+    }
+
+    .btn-copy:hover {
+      background: #475569;
+    }
+
+    .btn-clear {
+      background: #1e293b;
+      color: #94a3b8;
+      border: 1px solid #334155;
+    }
+
+    .btn-clear:hover {
+      background: #334155;
+    }
+
+    .btn-example {
+      background: #7c3aed;
+      color: #fff;
+    }
+
+    .btn-example:hover {
+      background: #6d28d9;
+    }
 
     /* ── MAIN LAYOUT ── */
     #main {
@@ -90,25 +136,30 @@
       min-width: 300px;
       transition: width 0.25s ease, min-width 0.25s ease;
     }
+
     #editor-panel.collapsed {
       width: 36px;
       min-width: 36px;
       overflow: hidden;
     }
+
     #editor-panel.collapsed #editor-wrap,
     #editor-panel.collapsed #console-label,
     #editor-panel.collapsed #console-panel {
       display: none;
     }
+
     #editor-panel.collapsed #editor-toolbar .label,
     #editor-panel.collapsed #editor-toolbar .kbd,
     #editor-panel.collapsed #editor-toolbar span:not(#collapse-btn) {
       display: none;
     }
+
     #editor-panel.collapsed #editor-toolbar {
       padding: 8px 4px;
       justify-content: center;
     }
+
     #editor-toolbar {
       background: #111827;
       padding: 8px 12px;
@@ -119,7 +170,11 @@
       font-size: 12px;
       color: #64748b;
     }
-    #editor-toolbar .label { margin-right: auto; }
+
+    #editor-toolbar .label {
+      margin-right: auto;
+    }
+
     #collapse-btn {
       background: #1e293b;
       border: 1px solid #334155;
@@ -132,7 +187,10 @@
       flex-shrink: 0;
       transition: background 0.15s;
     }
-    #collapse-btn:hover { background: #334155; }
+
+    #collapse-btn:hover {
+      background: #334155;
+    }
 
     .CodeMirror {
       flex: 1;
@@ -141,7 +199,11 @@
       line-height: 1.6;
       font-family: 'JetBrains Mono', 'Fira Code', 'Cascadia Code', monospace;
     }
-    .CodeMirror-scroll { height: 100%; }
+
+    .CodeMirror-scroll {
+      height: 100%;
+    }
+
     #editor-wrap {
       flex: 1;
       overflow: hidden;
@@ -157,6 +219,7 @@
       position: relative;
       background: #0a0a0f;
     }
+
     #preview-toolbar {
       background: #111827;
       padding: 8px 12px;
@@ -168,6 +231,7 @@
       color: #64748b;
       flex-shrink: 0;
     }
+
     #canvas-container {
       flex: 1;
       overflow: hidden;
@@ -177,16 +241,19 @@
       padding: 0;
       position: relative;
     }
+
     #sketch-mount {
       position: relative;
       overflow: hidden;
       flex-shrink: 0;
     }
+
     #canvas-container canvas {
       display: block;
-      box-shadow: 0 0 40px rgba(56,189,248,0.08);
+      box-shadow: 0 0 40px rgba(56, 189, 248, 0.08);
       border-radius: 4px;
     }
+
     #status-bar {
       background: #111827;
       padding: 5px 12px;
@@ -197,8 +264,14 @@
       gap: 16px;
       flex-shrink: 0;
     }
-    #status-bar .status-ok  { color: #22c55e; }
-    #status-bar .status-err { color: #ef4444; }
+
+    #status-bar .status-ok {
+      color: #22c55e;
+    }
+
+    #status-bar .status-err {
+      color: #ef4444;
+    }
 
     /* ── CONSOLE PANE ── */
     #console-panel {
@@ -211,9 +284,19 @@
       font-size: 12px;
       flex-shrink: 0;
     }
-    #console-panel .log   { color: #94a3b8; }
-    #console-panel .error { color: #f87171; }
-    #console-panel .warn  { color: #fbbf24; }
+
+    #console-panel .log {
+      color: #94a3b8;
+    }
+
+    #console-panel .error {
+      color: #f87171;
+    }
+
+    #console-panel .warn {
+      color: #fbbf24;
+    }
+
     #console-label {
       background: #111827;
       padding: 5px 12px;
@@ -227,7 +310,8 @@
     /* ── CHEATSHEET SIDEBAR (collapsible) ── */
     #cheatsheet-toggle {
       position: fixed;
-      right: 0; top: 50%;
+      right: 0;
+      top: 50%;
       transform: translateY(-50%);
       background: #7c3aed;
       color: #fff;
@@ -263,7 +347,11 @@
       z-index: 900;
       padding: 20px;
     }
-    #prompt-modal.open { display: flex; }
+
+    #prompt-modal.open {
+      display: flex;
+    }
+
     #prompt-dialog {
       width: min(860px, 96vw);
       max-height: 90vh;
@@ -277,17 +365,20 @@
       flex-direction: column;
       gap: 12px;
     }
+
     #prompt-dialog-header {
       display: flex;
       align-items: center;
       gap: 10px;
     }
+
     #prompt-dialog-title {
       font-size: 15px;
       font-weight: 700;
       color: #e2e8f0;
       flex: 1;
     }
+
     #prompt-close {
       padding: 4px 10px;
       background: #1e293b;
@@ -297,7 +388,11 @@
       font-size: 12px;
       cursor: pointer;
     }
-    #prompt-close:hover { background: #334155; }
+
+    #prompt-close:hover {
+      background: #334155;
+    }
+
     #prompt-idea {
       width: 100%;
       min-height: 120px;
@@ -311,25 +406,36 @@
       outline: none;
       line-height: 1.5;
     }
-    #prompt-idea:focus { border-color: #38bdf8; }
-    #prompt-idea::placeholder { color: #475569; }
+
+    #prompt-idea:focus {
+      border-color: #38bdf8;
+    }
+
+    #prompt-idea::placeholder {
+      color: #475569;
+    }
+
     #prompt-actions {
       display: flex;
       flex-wrap: wrap;
       gap: 8px;
       align-items: center;
     }
+
     #prompt-meta {
       color: #64748b;
       font-size: 12px;
       margin-left: auto;
     }
+
     #prompt-preview-wrap {
       display: none;
     }
+
     #prompt-preview-wrap.open {
       display: block;
     }
+
     #prompt-output {
       width: 100%;
       height: 180px;
@@ -343,11 +449,31 @@
       resize: vertical;
       line-height: 1.5;
     }
-    .btn-prompt { background: #0e7490; color: #fff; }
-    .btn-prompt:hover { background: #0891b2; }
-    .btn-raw { background: #1e3a5f; color: #93c5fd; border: 1px solid #2563eb; }
-    .btn-raw:hover { background: #1d4ed8; color: #fff; }
-    .btn-raw.active { background: #2563eb; color: #fff; }
+
+    .btn-prompt {
+      background: #0e7490;
+      color: #fff;
+    }
+
+    .btn-prompt:hover {
+      background: #0891b2;
+    }
+
+    .btn-raw {
+      background: #1e3a5f;
+      color: #93c5fd;
+      border: 1px solid #2563eb;
+    }
+
+    .btn-raw:hover {
+      background: #1d4ed8;
+      color: #fff;
+    }
+
+    .btn-raw.active {
+      background: #2563eb;
+      color: #fff;
+    }
 
     /* ── RAW SOURCE VIEW ── */
     #raw-view {
@@ -357,6 +483,7 @@
       padding: 16px;
       display: none;
     }
+
     #raw-view pre {
       color: #94a3b8;
       font-size: 11px;
@@ -369,83 +496,87 @@
     }
   </style>
 </head>
+
 <body>
 
-<!-- ── HEADER ── -->
-<div id="header">
-  <h1>⚡ VisLab</h1>
-  <span>Creative Coding Playground · q5.js + Tweakpane</span>
-  <div class="header-spacer"></div>
-  <button class="btn btn-prompt" onclick="togglePromptPanel()" title="Open Idea Prompt Generator">✨ Prompt</button>
-  <button class="btn btn-example" onclick="loadExample()">Load Example</button>
-  <button class="btn btn-copy"    onclick="copyCode()">Copy Code</button>
-  <button class="btn btn-clear"   onclick="clearConsole()">Clear Console</button>
-  <button class="btn btn-stop"    onclick="stopSketch()">■ Stop</button>
-  <button class="btn btn-run"     onclick="runSketch()">▶ Run</button>
-</div>
-
-<!-- ── PROMPT GENERATOR MODAL ── -->
-<div id="prompt-modal" onclick="if(event.target===this) closePromptPanel()">
-  <div id="prompt-dialog" role="dialog" aria-modal="true" aria-labelledby="prompt-dialog-title">
-    <div id="prompt-dialog-header">
-      <div id="prompt-dialog-title">Prompt Generator</div>
-      <button id="prompt-close" onclick="closePromptPanel()" title="Close">Esc</button>
-    </div>
-    <textarea id="prompt-idea"
-              placeholder="Describe your sketch idea. You can write multiple lines, details, goals, constraints, and interactions.&#10;&#10;Press Ctrl+Enter to generate."></textarea>
-    <div id="prompt-actions">
-      <button class="btn btn-prompt" onclick="generatePrompt()">Generate Prompt</button>
-      <button id="prompt-expand-btn" class="btn btn-copy" onclick="togglePromptPreview()">Expand</button>
-      <button class="btn btn-copy" onclick="copyPrompt()">Copy Prompt</button>
-      <div id="prompt-meta">No prompt generated yet</div>
-    </div>
-    <div id="prompt-preview-wrap">
-      <div id="prompt-output-label" style="color:#64748b; font-size:11px; margin-bottom:6px; display:none;">▼ Code block (select all to copy):</div>
-      <pre id="prompt-output" style="display:none; width:100%; height:280px; padding:10px 12px; background:#020617; border:1px solid #334155; border-radius:8px; color:#94a3b8; font-size:10px; font-family:'Courier New',monospace; overflow:auto; margin:0; white-space:pre-wrap; word-break:break-word; line-height:1.4;"></pre>
-    </div>
-  </div>
-</div>
-
-<!-- ── MAIN CONTENT ── -->
-<div id="main">
-
-  <!-- LEFT: CODE EDITOR -->
-  <div id="editor-panel">
-    <div id="editor-toolbar">
-      <span class="label">📝 Sketch Code</span>
-      <span class="kbd">Ctrl+Enter</span> to run
-      <button id="collapse-btn" onclick="toggleEditor()" title="Collapse/expand editor">◀</button>
-    </div>
-    <div id="editor-wrap">
-      <textarea id="code-input"></textarea>
-    </div>
-    <div id="console-label">🖥 Console</div>
-    <div id="console-panel" id="console"></div>
+  <!-- ── HEADER ── -->
+  <div id="header">
+    <h1>⚡ VisLab</h1>
+    <span>Creative Coding Playground · q5.js + Tweakpane</span>
+    <div class="header-spacer"></div>
+    <button class="btn btn-prompt" onclick="togglePromptPanel()" title="Open Idea Prompt Generator">✨ Prompt</button>
+    <button class="btn btn-example" onclick="loadExample()">Load Example</button>
+    <button class="btn btn-copy" onclick="copyCode()">Copy Code</button>
+    <button class="btn btn-clear" onclick="clearConsole()">Clear Console</button>
+    <button class="btn btn-stop" onclick="stopSketch()">■ Stop</button>
+    <button class="btn btn-run" onclick="runSketch()">▶ Run</button>
   </div>
 
-  <!-- RIGHT: CANVAS PREVIEW -->
-  <div id="preview-panel">
-    <div id="preview-toolbar">
-      <span>🎨 Preview</span>
-      <button class="btn btn-raw" id="raw-toggle-btn" onclick="toggleRawView()" title="View raw injected HTML/JS source">⟨/⟩ Raw</button>
-      <span style="margin-left:auto; color:#38bdf8" id="fps-display">fps: —</span>
-    </div>
-    <div id="canvas-container">
-      <div id="sketch-mount"></div>
-    </div>
-    <div id="raw-view">
-      <pre id="raw-source"></pre>
-    </div>
-    <div id="status-bar">
-      <span id="status-msg">Ready — paste your sketch code and press Run</span>
-      <span id="status-size" style="margin-left:auto"></span>
+  <!-- ── PROMPT GENERATOR MODAL ── -->
+  <div id="prompt-modal" onclick="if(event.target===this) closePromptPanel()">
+    <div id="prompt-dialog" role="dialog" aria-modal="true" aria-labelledby="prompt-dialog-title">
+      <div id="prompt-dialog-header">
+        <div id="prompt-dialog-title">Prompt Generator</div>
+        <button id="prompt-close" onclick="closePromptPanel()" title="Close">Esc</button>
+      </div>
+      <textarea id="prompt-idea"
+        placeholder="Describe your sketch idea. You can write multiple lines, details, goals, constraints, and interactions.&#10;&#10;Press Ctrl+Enter to generate."></textarea>
+      <div id="prompt-actions">
+        <button class="btn btn-prompt" onclick="generatePrompt()">Generate Prompt</button>
+        <button id="prompt-expand-btn" class="btn btn-copy" onclick="togglePromptPreview()">Expand</button>
+        <button class="btn btn-copy" onclick="copyPrompt()">Copy Prompt</button>
+        <div id="prompt-meta">No prompt generated yet</div>
+      </div>
+      <div id="prompt-preview-wrap">
+        <div id="prompt-output-label" style="color:#64748b; font-size:11px; margin-bottom:6px; display:none;">▼ Code
+          block (select all to copy):</div>
+        <pre id="prompt-output"
+          style="display:none; width:100%; height:280px; padding:10px 12px; background:#020617; border:1px solid #334155; border-radius:8px; color:#94a3b8; font-size:10px; font-family:'Courier New',monospace; overflow:auto; margin:0; white-space:pre-wrap; word-break:break-word; line-height:1.4;"></pre>
+      </div>
     </div>
   </div>
 
-</div>
+  <!-- ── MAIN CONTENT ── -->
+  <div id="main">
 
-<!-- ── PROMPT TEMPLATE SOURCE ── -->
-<script id="prompt-template" type="text/plain">
+    <!-- LEFT: CODE EDITOR -->
+    <div id="editor-panel">
+      <div id="editor-toolbar">
+        <span class="label">📝 Sketch Code</span>
+        <span class="kbd">Ctrl+Enter</span> to run
+        <button id="collapse-btn" onclick="toggleEditor()" title="Collapse/expand editor">◀</button>
+      </div>
+      <div id="editor-wrap">
+        <textarea id="code-input"></textarea>
+      </div>
+      <div id="console-label">🖥 Console</div>
+      <div id="console-panel" id="console"></div>
+    </div>
+
+    <!-- RIGHT: CANVAS PREVIEW -->
+    <div id="preview-panel">
+      <div id="preview-toolbar">
+        <span>🎨 Preview</span>
+        <button class="btn btn-raw" id="raw-toggle-btn" onclick="toggleRawView()"
+          title="View raw injected HTML/JS source">⟨/⟩ Raw</button>
+        <span style="margin-left:auto; color:#38bdf8" id="fps-display">fps: —</span>
+      </div>
+      <div id="canvas-container">
+        <div id="sketch-mount"></div>
+      </div>
+      <div id="raw-view">
+        <pre id="raw-source"></pre>
+      </div>
+      <div id="status-bar">
+        <span id="status-msg">Ready — paste your sketch code and press Run</span>
+        <span id="status-size" style="margin-left:auto"></span>
+      </div>
+    </div>
+
+  </div>
+
+  <!-- ── PROMPT TEMPLATE SOURCE ── -->
+  <script id="prompt-template" type="text/plain">
 You are an expert creative coder and science communicator working inside
 VisLab — a q5.js + Tweakpane environment with a fully pre-loaded preamble.
 
@@ -505,9 +636,9 @@ immediate, visible change.
 
 LAYOUT ZONES ({{WIDTH}}×{{HEIGHT}} canvas):
   LAYOUT.TITLE    = { x:0,   y:0,   w:{{WIDTH}}, h:60  }
-  LAYOUT.VIZ      = { x:0,   y:60,  w:620,  h:690 }
-  LAYOUT.PANEL    = { x:630, y:60,  w:394,  h:690 }
-  LAYOUT.CONTROLS = { x:0,   y:750, w:{{WIDTH}}, h:274 }
+  LAYOUT.VIZ      = { x:0,   y:60,  w:768,  h:600 }
+  LAYOUT.PANEL    = { x:768, y:60,  w:512,  h:600 }
+  LAYOUT.CONTROLS = { x:0,   y:660, w:{{WIDTH}}, h:140 }
 
 ──── NodeSystem (PRIMARY ENGINE) ───────────────────────────
   const ns = new NodeSystem(NODES, opts?);
@@ -528,7 +659,7 @@ LAYOUT ZONES ({{WIDTH}}×{{HEIGHT}} canvas):
     ];
   Colors available: #38bdf8  #4ade80  #f59e0b  #f472b6  #a78bfa
 
-  ⚠ LAYOUT.VIZ (w:620) is the NodeSystem UI zone — rail, caption, panel.
+  ⚠ LAYOUT.VIZ (w:768) is the NodeSystem UI zone — rail, caption, panel.
     Your diagram ACTOR positions must use FULL canvas coordinates.
     Do NOT confine actors to LAYOUT.VIZ.x / LAYOUT.VIZ.w.
     The VIZ background rect is drawn there; actors live outside it.
@@ -780,7 +911,8 @@ Generate a sketch for the following idea:
 {{IDEA}}
 </idea>
 </script>
-<!-- ── EDITOR + RUNTIME LOGIC ── -->
-<script src="ui.js"></script>
+  <!-- ── EDITOR + RUNTIME LOGIC ── -->
+  <script src="ui.js"></script>
 </body>
+
 </html>

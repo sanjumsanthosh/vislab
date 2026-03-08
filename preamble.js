@@ -9,10 +9,10 @@
 
 // ── LAYOUT CONSTANTS (responsive to canvas size) ─────────
 let LAYOUT = {
-  TITLE:   { x: 0,   y: 0,   w: 1024, h: 60  },
-  VIZ:     { x: 0,   y: 60,  w: 620,  h: 690 },
-  PANEL:   { x: 630, y: 60,  w: 394,  h: 690 },
-  CONTROLS:{ x: 0,   y: 760, w: 1024, h: 264 }
+  TITLE:    { x: 0,   y: 0,   w: 1280, h: 60  },
+  VIZ:      { x: 0,   y: 60,  w: 768,  h: 600 },
+  PANEL:    { x: 768, y: 60,  w: 512,  h: 600 },
+  CONTROLS: { x: 0,   y: 660, w: 1280, h: 140 }
 };
 
 function updateLAYOUT() {

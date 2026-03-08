@@ -51,7 +51,9 @@ let _lastRawHtml = '';
 let _rawViewActive = false;
 
 // ── Scale preview iframe to fill the canvas container ──
-const CANVAS_SIZE = 1024;
+const DESIGN_W = 1280;
+const DESIGN_H = 800;
+
 function scalePreview() {
   const container = document.getElementById('canvas-container');
   const mount     = document.getElementById('sketch-mount');
@@ -59,11 +61,11 @@ function scalePreview() {
   if (!iframe) return;
   const w = container.clientWidth;
   const h = container.clientHeight;
-  const scale = Math.min(w / CANVAS_SIZE, h / CANVAS_SIZE);
+  const scale = Math.min(w / DESIGN_W, h / DESIGN_H);
   iframe.style.transform = 'scale(' + scale + ')';
   iframe.style.transformOrigin = 'top left';
-  mount.style.width  = Math.round(CANVAS_SIZE * scale) + 'px';
-  mount.style.height = Math.round(CANVAS_SIZE * scale) + 'px';
+  mount.style.width  = Math.round(DESIGN_W * scale) + 'px';
+  mount.style.height = Math.round(DESIGN_H * scale) + 'px';
 }
 
 window.addEventListener('resize', scalePreview);
@@ -129,8 +131,8 @@ async function runSketch() {
   // Inject into iframe for isolation
   const iframe = document.createElement('iframe');
   iframe.style.cssText = 'border:none; display:block; transform-origin:top left;';
-  iframe.width  = CANVAS_SIZE;
-  iframe.height = CANVAS_SIZE;
+  iframe.width  = DESIGN_W;
+  iframe.height = DESIGN_H;
   mount.appendChild(iframe);
   currentSketchEl = iframe;
   scalePreview();
@@ -241,10 +243,8 @@ function generatePrompt() {
     document.getElementById('prompt-idea').focus();
     return;
   }
-  const viewportW = Math.round((window.visualViewport && window.visualViewport.width) || window.innerWidth || 1024);
-  const viewportH = Math.round((window.visualViewport && window.visualViewport.height) || window.innerHeight || 1024);
-  const width = Number.isFinite(viewportW) && viewportW > 0 ? viewportW : 1024;
-  const height = Number.isFinite(viewportH) && viewportH > 0 ? viewportH : 1024;
+  const width = DESIGN_W;
+  const height = DESIGN_H;
   const promptTemplate = document.getElementById('prompt-template').textContent.trim();
   const prompt = promptTemplate
     .replaceAll('{{WIDTH}}', String(width))

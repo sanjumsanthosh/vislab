@@ -79,7 +79,7 @@ const params = {
 let pane;
 
 function setup() {
-  createCanvas(1910, 903);
+  createCanvas(1280, 800);
   updateLAYOUT();
 
   hints.register([
