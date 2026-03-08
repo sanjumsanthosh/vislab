@@ -259,11 +259,11 @@ function generatePrompt() {
 
 function copyPrompt() {
   const out = document.getElementById('prompt-output');
-  if (!out.value) {
+  if (!out.textContent) {
     const generated = generatePrompt();
     if (!generated) return;
   }
-  navigator.clipboard.writeText(out.value);
+  navigator.clipboard.writeText(out.textContent);
   logToConsole('Prompt copied to clipboard.', 'log');
 }
 

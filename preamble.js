@@ -10,16 +10,18 @@
 // ── LAYOUT CONSTANTS (responsive to canvas size) ─────────
 let LAYOUT = {
   TITLE:    { x: 0,   y: 0,   w: 1280, h: 60  },
-  VIZ:      { x: 0,   y: 60,  w: 768,  h: 600 },
-  PANEL:    { x: 768, y: 60,  w: 512,  h: 600 },
+  RAIL:     { x: 0,   y: 60,  w: 1280, h: 80  },
+  VIZ:      { x: 0,   y: 140, w: 768,  h: 520 },
+  PANEL:    { x: 768, y: 140, w: 512,  h: 520 },
   CONTROLS: { x: 0,   y: 660, w: 1280, h: 140 }
 };
 
 function updateLAYOUT() {
   LAYOUT = {
     TITLE:    { x: 0,            y: 0,             w: width,         h: 60 },
-    VIZ:      { x: 0,            y: 60,            w: width * 0.6,   h: height - 200 },
-    PANEL:    { x: width * 0.6,  y: 60,            w: width * 0.4,   h: height - 200 },
+    RAIL:     { x: 0,            y: 60,            w: width,         h: 80  },
+    VIZ:      { x: 0,            y: 140,           w: width * 0.6,   h: height - 280 },
+    PANEL:    { x: width * 0.6,  y: 140,           w: width * 0.4,   h: height - 280 },
     CONTROLS: { x: 0,            y: height - 140,  w: width,         h: 140 }
   };
 }

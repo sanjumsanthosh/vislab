@@ -636,9 +636,14 @@ immediate, visible change.
 
 LAYOUT ZONES ({{WIDTH}}×{{HEIGHT}} canvas):
   LAYOUT.TITLE    = { x:0,   y:0,   w:{{WIDTH}}, h:60  }
-  LAYOUT.VIZ      = { x:0,   y:60,  w:768,  h:600 }
-  LAYOUT.PANEL    = { x:768, y:60,  w:512,  h:600 }
+  LAYOUT.RAIL     = { x:0,   y:60,  w:{{WIDTH}}, h:80  }
+  LAYOUT.VIZ      = { x:0,   y:140, w:768,  h:520 }
+  LAYOUT.PANEL    = { x:768, y:140, w:512,  h:520 }
   LAYOUT.CONTROLS = { x:0,   y:660, w:{{WIDTH}}, h:140 }
+
+  IMPORTANT: The RAIL zone (y:60-140) contains the NodeSystem timeline.
+  Always draw your VIZ background rect at LAYOUT.VIZ — NEVER at y:60.
+  Diagram actors should use FULL canvas coordinates, not LAYOUT.VIZ bounds.
 
 ──── NodeSystem (PRIMARY ENGINE) ───────────────────────────
   const ns = new NodeSystem(NODES, opts?);
@@ -659,10 +664,10 @@ LAYOUT ZONES ({{WIDTH}}×{{HEIGHT}} canvas):
     ];
   Colors available: #38bdf8  #4ade80  #f59e0b  #f472b6  #a78bfa
 
-  ⚠ LAYOUT.VIZ (w:768) is the NodeSystem UI zone — rail, caption, panel.
+  ⚠ LAYOUT.VIZ (y:140, w:768) is the background drawing zone.
+    LAYOUT.RAIL (y:60-140) holds the NodeSystem rail — do NOT cover it.
     Your diagram ACTOR positions must use FULL canvas coordinates.
     Do NOT confine actors to LAYOUT.VIZ.x / LAYOUT.VIZ.w.
-    The VIZ background rect is drawn there; actors live outside it.
 
     For a 5-actor diagram on {{WIDTH}}px canvas:
       const spacing = {{WIDTH}} / 6;
