@@ -604,11 +604,7 @@ immediate, visible change.
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 - Output ONLY raw JavaScript — no markdown fences, no explanations.
 - ALWAYS call createCanvas({{WIDTH}}, {{HEIGHT}}) inside setup().
-- For NodeSystem diagrams, spread actors across the FULL canvas width.
-  Do NOT confine actor positions to LAYOUT.VIZ (0–620 px).
-  The NodeSystem rail and caption already occupy LAYOUT.VIZ.
-  Example for {{WIDTH}}px: const spacing = {{WIDTH}} / 6;
-  actor positions: spacing*1, spacing*2, spacing*3, spacing*4, spacing*5
+- ALWAYS call updateLAYOUT() right after createCanvas() in setup().
 - Do NOT define anything already in the preamble (full list below).
 - Do NOT use createSlider(), createButton(), or raw DOM APIs.
 - q5.js API = p5.js: circle(), rect(), text(), fill(), stroke(),
@@ -634,279 +630,307 @@ immediate, visible change.
 ## PREAMBLE — DO NOT REDEFINE ANY OF THESE
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
-LAYOUT ZONES ({{WIDTH}}×{{HEIGHT}} canvas):
-  LAYOUT.TITLE    = { x:0,   y:0,   w:{{WIDTH}}, h:60  }
-  LAYOUT.RAIL     = { x:0,   y:60,  w:{{WIDTH}}, h:80  }
-  LAYOUT.VIZ      = { x:0,   y:140, w:768,  h:520 }
-  LAYOUT.PANEL    = { x:768, y:140, w:512,  h:520 }
-  LAYOUT.CONTROLS = { x:0,   y:660, w:{{WIDTH}}, h:140 }
+LAYOUT ZONES ({{WIDTH}}x{{HEIGHT}} canvas, set by updateLAYOUT()):
+  LAYOUT.TITLE    = { x:0,   y:0,   w:width, h:60  }
+  LAYOUT.RAIL     = { x:0,   y:60,  w:width, h:80  }
+  LAYOUT.VIZ      = { x:0,   y:140, w:width*0.6, h:height-280 }
+  LAYOUT.PANEL    = { x:width*0.6, y:140, w:width*0.4, h:height-280 }
+  LAYOUT.CONTROLS = { x:0,   y:height-140, w:width, h:140 }
 
-  IMPORTANT: The RAIL zone (y:60-140) contains the NodeSystem timeline.
-  Always draw your VIZ background rect at LAYOUT.VIZ — NEVER at y:60.
-  Diagram actors should use FULL canvas coordinates, not LAYOUT.VIZ bounds.
+  The canvas is divided into TWO COLUMNS below the rail:
+    LEFT  = LAYOUT.VIZ   (diagram, actors, arrows, formulas)
+    RIGHT = LAYOUT.PANEL (info panels with subPanel())
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+## CRITICAL LAYOUT RULES — VIOLATIONS CAUSE VISUAL OVERLAP
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+  1. DIAGRAM ACTORS go in VIZ zone ONLY (left 60% of canvas).
+     Use LAYOUT.VIZ.x and LAYOUT.VIZ.w to compute positions:
+       var clientX = LAYOUT.VIZ.x + LAYOUT.VIZ.w * 0.18;
+       var serverX = LAYOUT.VIZ.x + LAYOUT.VIZ.w * 0.82;
+     NEVER use width/2 or width/6 — those extend into PANEL zone.
+
+  2. INFO PANELS go in PANEL zone ONLY (right 40% of canvas).
+     Use LAYOUT.PANEL.x, LAYOUT.PANEL.y, LAYOUT.PANEL.w, LAYOUT.PANEL.h
+     to position subPanel() calls. NEVER hardcode panel coordinates.
+
+  3. KEEP NODE LABELS SHORT — max ~12 characters.
+     Rail node dots are spaced across the full width. Long labels
+     overlap each other and the actor names below.
+       ✗ '1. Hello and Capabilities'  — too long, overlaps neighbors
+       ✓ '1. Hello'                   — fits cleanly
+
+  4. FORMULA BOXES must stay inside VIZ zone.
+     Use VIZ-relative x coordinates:
+       var mathX = (clientX + serverX) / 2;
+     NEVER use width/2 — that is in the PANEL zone.
+
+  5. FORMULAS must not overlap the CAPTION strip.
+     ns.drawCaption() draws at approximately y=600.
+     Keep formulas ABOVE y=560 or they will be hidden.
+     Best: y = LAYOUT.VIZ.y + LAYOUT.VIZ.h - 80
+
+  6. RECTMODE: If you use rectMode(CENTER), ALWAYS reset to
+     rectMode(CORNER) before returning from that function.
+     Leaked CENTER mode causes ALL subsequent rect() calls
+     (backgrounds, panels, subPanel) to shift by half their size.
+       rectMode(CENTER);
+       rect(x, y, 140, 60, 10);   // draws centered box
+       rectMode(CORNER);          // ALWAYS RESET!
+
+  7. RGB ARRAYS with fill()/stroke():
+     ColorRamp.at() and hexRGB() return [r,g,b] arrays.
+     NEVER pass an array directly to fill() or stroke().
+     ALWAYS destructure:
+       var col = RAMP.at(t);
+       ✗ fill(col, col, col)          — WRONG, produces garbage
+       ✗ stroke(col, col, col)        — WRONG
+       ✓ fill(col[0], col[1], col[2]) — CORRECT
+       ✓ stroke(col[0], col[1], col[2], 180) — CORRECT with alpha
+     For preamble helpers that ACCEPT arrays (safeGlow, formulaBox,
+     spanAnnotation), pass the array directly:
+       ✓ safeGlow(x, y, r, col, 80)
+       ✓ formulaBox(x, y, 'eq', col, opts)
+
+  8. DRAW ORDER in draw() is critical:
+     a. background, ns.update(), ns.drawRail()
+     b. VIZ background rect + PANEL background rect
+     c. Diagram code (actors, arrows, formulas)
+     d. Info panels (subPanel, text)
+     e. ns.drawCaption()
+     f. hints.draw(ns.acRGB) — MUST BE LAST
+     If hints.draw() is called before backgrounds, the hint popup
+     gets covered by the VIZ/PANEL background rects.
 
 ──── NodeSystem (PRIMARY ENGINE) ───────────────────────────
   const ns = new NodeSystem(NODES, opts?);
-    opts: { railY:95, margin:80, captionY:750, captionH:100, fadeSpeed:7 }
+    opts: { railY:95, margin:80, captionY:600, captionH:100, fadeSpeed:7 }
 
   Properties:  ns.active  ns.node  ns.acRGB  ns.fade  ns.parentNode
   Methods:
     ns.update()       → top of draw()
     ns.drawRail()     → timeline bar
-    ns.drawCaption()  → bottom caption strip
+    ns.drawCaption()  → bottom caption strip (at ~y=600)
     ns.hit(mx,my)     → in mousePressed()
 
   NODES format:
     const NODES = [
-      { label:'Name', color:'#38bdf8',
-        accent:'!!The single key insight — !! prefix = accent colour',
-        caption:['Body line 1.','Body line 2.'] },
+      { label:'Short Name', color:'#38bdf8',
+        accent:'!!Key insight.', caption:['Line 1.','Line 2.'] },
     ];
   Colors available: #38bdf8  #4ade80  #f59e0b  #f472b6  #a78bfa
 
-  ⚠ LAYOUT.VIZ (y:140, w:768) is the background drawing zone.
-    LAYOUT.RAIL (y:60-140) holds the NodeSystem rail — do NOT cover it.
-    Your diagram ACTOR positions must use FULL canvas coordinates.
-    Do NOT confine actors to LAYOUT.VIZ.x / LAYOUT.VIZ.w.
-
-    For a 5-actor diagram on {{WIDTH}}px canvas:
-      const spacing = {{WIDTH}} / 6;
-      actor positions: spacing*1, spacing*2, spacing*3, spacing*4, spacing*5
-
 ──── HintSystem (USE IN EVERY SKETCH) ──────────────────────
   const hints = new HintSystem();
-  hints.register(['hint…','hint…'])  → in setup()
-  hints.draw(ns.acRGB)               → in draw(), after ns.drawRail()
-  hints.hit(mx,my)                   → FIRST call in mousePressed()
+  hints.register(['hint...','hint...'])  → in setup()
+  hints.draw(ns.acRGB)  → LAST call in draw(), AFTER ns.drawCaption()
+  hints.hit(mx,my)      → FIRST call in mousePressed()
 
 ──── ZoneHighlight (use when diagram has clickable parts) ───
   const zones = new ZoneHighlight();
   zones.add(id, x, y, w, h, nodeIdx, tooltipLabel)  → in setup()
-  zones.update(mx, my, acRGB, ns.active)             → LAST in draw()
-  zones.hit(mx, my, ns)                              → in mousePressed()
+  zones.update(mx, my, acRGB, ns.active)  → in draw(), before caption
+  zones.hit(mx, my, ns)                   → in mousePressed()
 
 ──── ProbePoint (use for continuous measurable fields) ──────
   const probe = new ProbePoint();
-  probe.register(fn)     fn(x,y)→string, call outside draw()
-  probe.set(x,y)         place probe
-  probe.clear()
+  probe.register(fn)     fn(x,y)→string
+  probe.set(x,y) / probe.clear()
   probe.draw(acRGB)      in draw()
   probe.hitClear(mx,my)  in mousePressed()
 
 ──── formulaBox(x, y, formula, acRGB, opts?) ────────────────
-  Draws equation bubble on diagram.
+  Draws equation bubble on diagram. MUST be inside VIZ zone.
   opts: { w:260, h:32, size:13, sub:'explanation' }
-  
-  CRITICAL COLOR RULES:
-  - acRGB parameter is already an [r,g,b] array from ns.acRGB or ColorRamp
-  - NEVER wrap it in brackets again: [acRGB] — breaks injection
-  - NEVER pass [r,g,b,r,g,b] — never triple values
-  - ALWAYS pass color parameter directly:
-    CORRECT:   formulaBox(x, y, 'eq', acRGB, opts)
-    CORRECT:   const col = RAMP.at(t); formulaBox(x, y, 'eq', col, opts)
-    WRONG:     formulaBox(x, y, 'eq', [acRGB[0], acRGB[1], acRGB[2]], opts)
-    WRONG:     formulaBox(x, y, 'eq', [col, col, col], opts)
+  ALWAYS pass color directly (acRGB or ColorRamp result).
 
 ──── ColorRamp ──────────────────────────────────────────────
-  const ramp = new ColorRamp([{t,r,g,b},…]);
-  const [r,g,b] = ramp.at(t)   returns [r,g,b] clamped 0–1
+  const ramp = new ColorRamp([{t,r,g,b},...]);
+  var col = ramp.at(t)   returns [r,g,b]
 
-  ALWAYS declare ramps explicitly — never assume globals:
-  const RAMP_HEAT = new ColorRamp([
-    { t: 0,   r: 80,  g: 140, b: 255 },
-    { t: 0.5, r: 255, g: 140, b: 20  },
-    { t: 1,   r: 255, g: 40,  b: 20  }
-  ]);
-
-  Usage:
-  const heatCol = RAMP_HEAT.at(map(value, minVal, maxVal, 0, 1));
-  formulaBox(x, y, 'text', heatCol, opts)   <-- heatCol IS [r,g,b]
-  safeGlow(x, y, r, heatCol, alpha)         <-- pass directly
-  
-  NEVER: const [r,g,b] = heatCol; formulaBox(..., [r, g, b], ...) 
-         This creates nested arrays and breaks injection
-
-  const RAMP_PRESSURE = new ColorRamp([
-    { t: 0,   r: 56,  g: 189, b: 248 },
-    { t: 0.5, r: 74,  g: 222, b: 128 },
-    { t: 1,   r: 248, g: 113, b: 113 }
-  ]);
-  const RAMP_HEAT = new ColorRamp([
-    { t: 0,   r: 80,  g: 140, b: 255 },
-    { t: 0.5, r: 255, g: 140, b: 20  },
-    { t: 1,   r: 255, g: 40,  b: 20  }
-  ]);
+  Usage with fill/stroke — ALWAYS destructure:
+    var heatCol = RAMP.at(map(val, lo, hi, 0, 1));
+    fill(heatCol[0], heatCol[1], heatCol[2]);        // for fill/stroke
+    formulaBox(x, y, 'text', heatCol, opts);          // for preamble fns
+    safeGlow(x, y, r, heatCol, alpha);                // for preamble fns
 
 ──── spanAnnotation(x1, x2, y, label, rgb, opts?) ───────────
-  Double-headed arrow + centred label. Use for measurable spans.
+  Double-headed arrow + centred label.
   opts: { offset:0, alpha:160, weight:1.5, size:11 }
 
-──── Utilities (all preamble-provided — do NOT redefine) ────
-  hexRGB(hex)                  → [r,g,b]
-  safeGlow(x,y,r,rgb,alpha)   → layered glow, rgb is [r,g,b] array
-    ⚠ radius should NEVER exceed 40px — large values produce oversized
-      halos that cover actors.
-      ✓ safeGlow(x, y, 20, acRGB, 70)   — correct
-      ✗ safeGlow(x, y, 80, acRGB, 70)   — looks like a glowing TV
-  inZone(mx,my,zone)           → bool
-  drawCrosshair(p,mx,my)       → subtle crosshair inside VIZ zone
-  makePane('Title')
-  addSlider(pane,params,key,{min,max,step,label})
-  addButton(pane,label,fn)
-
-──── StepManager (FALLBACK — linear only) ───────────────────
-  const sm = new StepManager([{title,body:[…],formula},…]);
-  sm.update() / sm.drawTitleBar(this) / sm.drawPanel(this)
-  sm.drawNavButtons(this) → {prev,next}
-  sm.next() / sm.prev()
-  sm.color  → hex string — ALWAYS convert: const acRGB=hexRGB(sm.color)
-
-  ⚠ STRICT draw order — violations cause nav buttons to not render:
-    1. steps.drawTitleBar(window)              ← FIRST
-    2. steps.drawPanel(window)                 ← SECOND
-    3. navBtns = steps.drawNavButtons(window)  ← LAST (renders on top)
-    Never call drawNavButtons before drawPanel.
-
 ──── subPanel(x, y, w, h, title, rgb, opts?) ────────────────
-  Framed panel with mini-title. Use for comparison side-by-side layouts.
+  Framed panel with mini-title. Place in LAYOUT.PANEL zone.
+  Keep text short — panel width is only ~512px.
+  Leave bottom ~160px of PANEL free for Tweakpane controls.
 
-  [!] Info/physics panels must be placed OUTSIDE the diagram actor zone.
-      For full-width diagrams, place panels at right edge.
-      Always verify panel x + w < canvas width.
-      Use compact rows (height ~38px each) so the panel fits in the canvas.
+──── Utilities (do NOT redefine) ────────────────────────────
+  hexRGB(hex) → [r,g,b]
+  safeGlow(x,y,r,rgb,alpha) — radius NEVER > 40px
+  inZone(mx,my,zone) → bool
+  makePane('Title') / addSlider() / addButton()
 
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 ## Q5.JS COLOR RULES — VIOLATIONS CAUSE RUNTIME CRASH
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
-  [ERROR] fill('rgba(74,222,128,0.5)')    CRASH - never CSS rgba
-  [ERROR] fill('#4ade80', 128)            CRASH - never hex with alpha
-  [ERROR] drawGlow(...)                   CRASH - never use drawGlow()
-  [ERROR] formulaBox(..., [r,g,b], ...)   CRASH - NEVER nest RGB in brackets
-  
+  [ERROR] fill('rgba(74,222,128,0.5)')    CRASH
+  [ERROR] fill('#4ade80', 128)            CRASH
+  [ERROR] drawGlow(...)                   CRASH - use safeGlow()
+  [ERROR] fill(rgbArray, rgbArray, rgbArray) — WRONG, garbage output
+  [ERROR] stroke(rgbArray, rgbArray, rgbArray) — WRONG
+  [ERROR] formulaBox(..., [r,g,b], ...)   CRASH
+
   [OK] fill(74, 222, 128)                 correct
   [OK] fill(74, 222, 128, 128)            correct with alpha
+  [OK] fill(col[0], col[1], col[2])       correct — destructured array
   [OK] background('#0a0a0f')              OK for background() only
-  [OK] safeGlow(x, y, r, acRGB, 60)      correct - pass acRGB directly
-  [OK] formulaBox(..., acRGB, ...)        correct - pass RGB as-is
-  [OK] formulaBox(..., heatCol, ...)      correct - heatCol from ColorRamp
-
-  REMEMBER: acRGB and heatCol are ALREADY [r,g,b] arrays.
-  Do NOT wrap them again in [ ].
-  Pass them directly to all functions.
+  [OK] safeGlow(x, y, r, acRGB, 60)      correct — pass array to helper
+  [OK] formulaBox(..., acRGB, ...)        correct — pass array to helper
 
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-## NODESYSTEM FULL TEMPLATE
+## NODESYSTEM FULL TEMPLATE (CORRECT DRAW ORDER)
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
-const NODES = [
-  { label:'Node 1', color:'#38bdf8', accent:'!!Key insight.', caption:['…','…'] },
-  { label:'Node 2', color:'#4ade80', accent:'!!Key insight.', caption:['…','…'] },
-  { label:'Node 3', color:'#f59e0b', accent:'!!Key insight.', caption:['…','…'] },
+var NODES = [
+  { label:'Step 1', color:'#38bdf8', accent:'!!Insight.', caption:['...'] },
+  { label:'Step 2', color:'#4ade80', accent:'!!Insight.', caption:['...'] },
+  { label:'Step 3', color:'#f59e0b', accent:'!!Insight.', caption:['...'] },
 ];
-const ns    = new NodeSystem(NODES);
-const hints = new HintSystem();
-// const zones = new ZoneHighlight();   ← uncomment if diagram has clickable parts
-// const probe = new ProbePoint();      ← uncomment if probing a continuous field
+var ns    = new NodeSystem(NODES);
+var hints = new HintSystem();
 
-const params = { a: defaultA, b: defaultB };
-let pane;
+var params = { a: 1.0, b: 0.5 };
+var pane;
 
 function setup() {
   createCanvas({{WIDTH}}, {{HEIGHT}});
-  hints.register([
-    'Click a milestone dot to explore each stage',
-    'Adjust [Slider A] — watch [X] respond',
-    'Adjust [Slider B] — watch [Y] respond',
-    // 'Click any [part] to jump to that concept',    ← if ZoneHighlight
-    // 'Click the diagram to probe [value] there',    ← if ProbePoint
-  ]);
-  pane = makePane('Topic Name');
-  addSlider(pane, params, 'a', { min:…, max:…, step:…, label:'…' });
-  addSlider(pane, params, 'b', { min:…, max:…, step:…, label:'…' });
-  addButton(pane, 'Reset', () => { params.a = defaultA; params.b = defaultB; });
+  updateLAYOUT();
 
-  // zones.add('partName', x, y, w, h, nodeIdx, 'Tooltip label');
-  // probe.register((x,y) => 'value = ' + compute(x,y));
+  hints.register([
+    'Click a milestone dot to explore each stage.',
+    'Adjust sliders to see parameters change.',
+  ]);
+  pane = makePane('Topic');
+  addSlider(pane, params, 'a', { min:0, max:2, step:0.01, label:'Param A' });
+  addButton(pane, 'Reset', function() { params.a = 1.0; params.b = 0.5; });
 }
 
 function draw() {
   background('#0a0a0f');
   ns.update();
   ns.drawRail();
-  hints.draw(ns.acRGB);
 
+  // Draw zone backgrounds BEFORE any content
   fill(15, 15, 26); noStroke();
   rect(LAYOUT.VIZ.x, LAYOUT.VIZ.y, LAYOUT.VIZ.w, LAYOUT.VIZ.h);
 
-  const acRGB = ns.acRGB;
+  fill(12, 14, 24); noStroke();
+  rect(LAYOUT.PANEL.x, LAYOUT.PANEL.y, LAYOUT.PANEL.w, LAYOUT.PANEL.h);
 
-  // ── VISUALIZATION CODE ──
-  // Gate layers:    if (ns.active >= 1) { … }
-  // Accent fill:    fill(acRGB[0], acRGB[1], acRGB[2])
-  // Accent + alpha: fill(acRGB[0], acRGB[1], acRGB[2], 180)
-  // Glow:           safeGlow(x, y, radius, acRGB, maxAlpha)
-  // Formula:        formulaBox(x, y, 'eq', acRGB, { w:300 })
-  // Span:           spanAnnotation(x1, x2, y, 'label', acRGB)
-  // Gradient:       const [r,g,b] = RAMP_HEAT.at(map(val,min,max,0,1))
-  // White text:     fill(226, 232, 240)
-  // Muted text:     fill(148, 163, 184)
+  var acRGB = ns.acRGB;
 
-  // probe.draw(acRGB);
+  // ── DIAGRAM CODE (VIZ zone only) ──
+  // Use LAYOUT.VIZ to position all diagram elements.
+  // If using rectMode(CENTER), ALWAYS reset to rectMode(CORNER).
+  // For fill/stroke with ColorRamp: fill(col[0], col[1], col[2])
+  // For formulaBox/safeGlow: pass array directly.
+  // Keep formulas above y=560 to avoid caption overlap.
 
-  // zones.update(mouseX, mouseY, acRGB, ns.active);  ← LAST, before caption
+  drawDiagram(acRGB);
+
+  // ── INFO PANELS (PANEL zone only) ──
+  drawInfoPanels(acRGB);
+
+  // ── CAPTION (bottom strip) ──
   ns.drawCaption();
+
+  // ── HINTS (MUST BE LAST — renders popup on top of everything) ──
+  hints.draw(ns.acRGB);
+}
+
+function drawDiagram(acRGB) {
+  var vizX = LAYOUT.VIZ.x;
+  var vizW = LAYOUT.VIZ.w;
+  var leftX  = vizX + vizW * 0.2;
+  var rightX = vizX + vizW * 0.8;
+  // ... diagram drawing code ...
+  // If using rectMode(CENTER), reset:
+  // rectMode(CENTER); rect(...); rectMode(CORNER);
+}
+
+function drawInfoPanels(acRGB) {
+  var px = LAYOUT.PANEL.x + 8;
+  var pw = LAYOUT.PANEL.w - 16;
+  var py = LAYOUT.PANEL.y;
+  var ph = Math.floor(LAYOUT.PANEL.h * 0.5);
+
+  subPanel(px, py, pw, ph, 'About This Diagram', acRGB);
+  // ... panel text at compact 17px line height ...
+
+  // Leave bottom ~160px of PANEL zone free for Tweakpane.
+  var secY = py + ph + 8;
+  var secH = Math.floor(LAYOUT.PANEL.h * 0.28);
+  subPanel(px, secY, pw, secH, 'Key Insights', acRGB);
+  // ... more text ...
 }
 
 function mousePressed() {
-  if (hints.hit(mouseX, mouseY))               return;   // ALWAYS first
-  // if (probe.hitClear(mouseX,mouseY)) { probe.clear(); return; }
-  // if (zones.hit(mouseX, mouseY, ns))           return;
+  if (hints.hit(mouseX, mouseY)) return;   // ALWAYS FIRST
   ns.hit(mouseX, mouseY);
-  // else probe.set(mouseX, mouseY);              ← if ProbePoint active
 }
 
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 ## ANTI-PATTERNS — NEVER DO THESE
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-  [ERROR] Redefine preamble tools: hexRGB, safeGlow, NodeSystem, etc.
-  [ERROR] fill(node.color) — convert with hexRGB() first
-  [ERROR] fill('#hex', alpha) — never hex + alpha parameter
-  [ERROR] drawGlow() — use safeGlow() instead
-  [ERROR] safeGlow radius > 40px — creates oversized halos
-  [ERROR] formulaBox(..., [heatCol, heatCol, heatCol], ...) — never nest
-  [ERROR] text with newlines — q5.js ignores them, use separate calls
-  [ERROR] Backtick template literals — breaks document.write()
-  [ERROR] Undeclared ColorRamp — always declare explicitly
-  [ERROR] zones.update() before viz code — MUST be before ns.drawCaption()
-  [ERROR] hints.hit() not FIRST call in mousePressed()
-  [ERROR] StepManager for concepts with physical diagrams
-  [ERROR] Zero-width or hidden characters in strings
-  [ERROR] Mathematical notation: {ab}, ^{xy}, unicode symbols
+  [ERROR] Diagram actors in PANEL zone
+  [ERROR] Info panels in VIZ zone
+  [ERROR] formulaBox at y > 560 (hidden by caption)
+  [ERROR] formulaBox at x > LAYOUT.VIZ.w (hidden by panels)
+  [ERROR] Node labels > 12 characters (cause rail overlap)
+  [ERROR] rectMode(CENTER) not reset to rectMode(CORNER)
+  [ERROR] fill(rgbArray, rgbArray, rgbArray) — use fill(a[0],a[1],a[2])
+  [ERROR] stroke(rgbArray, rgbArray, rgbArray) — same rule
+  [ERROR] hints.draw() before VIZ/PANEL backgrounds
+  [ERROR] Hardcoded panel x=1260, w=610 — use LAYOUT.PANEL
+  [ERROR] Redefine preamble tools
+  [ERROR] fill(node.color) — use hexRGB() first
+  [ERROR] fill('#hex', alpha) — never hex + alpha
+  [ERROR] drawGlow() — use safeGlow()
+  [ERROR] safeGlow radius > 40px
+  [ERROR] formulaBox(..., [col, col, col], ...) — never nest
+  [ERROR] Backtick template literals
+  [ERROR] Undeclared ColorRamp
+  [ERROR] Unicode symbols in strings
 
-  [OK] formulaBox(x, y, 'text', acRGB, opts) — pass color directly
-  [OK] const heatCol = RAMP.at(t); formulaBox(..., heatCol, ...)
-  [OK] safeGlow(x, y, r, acRGB, 80) — array as-is, no nesting
-  [OK] fill(acRGB[0], acRGB[1], acRGB[2], alpha) — destructured
+  [OK] Actors at LAYOUT.VIZ.x + VIZ.w * fraction
+  [OK] Panels at LAYOUT.PANEL.x with PANEL.w width
+  [OK] formulaBox inside VIZ zone, above y=560
+  [OK] rectMode(CENTER) + reset to CORNER in same function
+  [OK] fill(col[0], col[1], col[2]) — destructured
+  [OK] hints.draw() as LAST call in draw()
+  [OK] Short node labels: '1. Hello', '2. Exchange'
 
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 ## PRE-FLIGHT CHECKLIST
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-  [CHECK] createCanvas({{WIDTH}}, {{HEIGHT}}) in setup()
-  [CHECK] NodeSystem chosen or StepManager justified
+  [CHECK] createCanvas({{WIDTH}}, {{HEIGHT}}) then updateLAYOUT()
+  [CHECK] Diagram elements only in LAYOUT.VIZ zone
+  [CHECK] Info panels only in LAYOUT.PANEL zone
+  [CHECK] Node labels max 12 characters
+  [CHECK] hints.draw() is the LAST call in draw()
+  [CHECK] VIZ + PANEL background rects drawn before content
+  [CHECK] rectMode(CENTER) always reset to rectMode(CORNER)
+  [CHECK] fill/stroke use col[0],col[1],col[2] not col,col,col
+  [CHECK] formulaBox inside VIZ zone, y < 560
+  [CHECK] Bottom ~160px of PANEL left free for Tweakpane
   [CHECK] HintSystem.register() with 3+ hints in setup()
-  [CHECK] All ColorRamps declared explicitly
-  [CHECK] No backtick template literals anywhere
-  [CHECK] No nested arrays in function calls (CRITICAL)
-  [CHECK] No Unicode symbols in any strings
-  [CHECK] safeGlow radius <= 40px everywhere
-  [CHECK] formulaBox() passes colors directly, not [r,g,b]
   [CHECK] hints.hit() is FIRST in mousePressed()
-  [CHECK] zones.update() is LAST before ns.drawCaption()
+  [CHECK] No backtick template literals
+  [CHECK] No nested arrays in function calls
+  [CHECK] No Unicode symbols in strings
+  [CHECK] safeGlow radius <= 40px
   [CHECK] No preamble functions redefined
-  [CHECK] No drawGlow() calls — only safeGlow()
 
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
